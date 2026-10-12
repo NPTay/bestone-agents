@@ -79,3 +79,23 @@ def test_entrypoint_command() -> None:
     text = (DEPLOY / "entrypoint.sh").read_text(encoding="utf-8")
     assert "alembic upgrade head" in text
     assert "--proxy-headers" in text and '"$TRUSTED_PROXY_IPS"' in text
+
+
+def test_test_override_binds_db_to_localhost_only() -> None:
+    text = (DEPLOY / "docker-compose.test.yml").read_text(encoding="utf-8")
+    data: dict[str, Any] = yaml.safe_load(text)
+    assert data["services"]["db"]["ports"] == ["127.0.0.1:5432:5432"]
+
+
+def test_compose_name_and_ip_range() -> None:
+    data = _compose()
+    assert data["name"] == "bestone"
+    cfg = data["networks"]["default"]["ipam"]["config"][0]
+    assert cfg["ip_range"] == "172.28.0.128/25"
+
+
+def test_bootstrap_fixes_ownership_and_timezone() -> None:
+    text = (DEPLOY / "bootstrap.sh").read_text(encoding="utf-8")
+    assert 'chown "$OWNER:$OWNER" .env' in text
+    assert "timedatectl set-timezone Asia/Ho_Chi_Minh" in text
+    assert "usermod -aG docker" in text

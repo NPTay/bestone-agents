@@ -57,6 +57,8 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
 fi
 systemctl enable --now docker
 if [ -n "$NEW_USER" ]; then usermod -aG docker "$NEW_USER"; fi
+OWNER="${SUDO_USER:-root}"
+if [ "$OWNER" != "root" ]; then usermod -aG docker "$OWNER"; fi
 
 echo "==> 3. File .env"
 cd "$REPO"
@@ -77,6 +79,7 @@ fill_if_empty() {
 fill_if_empty POSTGRES_PASSWORD
 fill_if_empty SESSION_SECRET_KEY
 chmod 600 .env
+chown "$OWNER:$OWNER" .env
 if ! grep -qE '^APP_DOMAIN=.+' .env; then
   echo "CANH BAO: APP_DOMAIN trong .env dang trong. Dien ten mien (nano .env) roi chay lai script." >&2
   exit 1
@@ -86,8 +89,10 @@ echo "==> 4. Khoi dong he thong"
 $COMPOSE up -d --build
 $COMPOSE exec -T app python -m app.knowledge.ingest
 
-echo "==> 5. Cron backup hang ngay 02:00"
-mkdir -p "$REPO/backups"
+echo "==> 5. Mui gio Viet Nam va cron backup hang ngay 02:00"
+timedatectl set-timezone Asia/Ho_Chi_Minh || true
+mkdir -p "$REPO/backups/weekly"
+chown -R "$OWNER:$OWNER" "$REPO/backups"
 chmod +x "$REPO/deploy/backup.sh"
 CRON_LINE="0 2 * * * cd $REPO && deploy/backup.sh >> backups/backup.log 2>&1"
 { crontab -l 2>/dev/null | grep -vF "deploy/backup.sh" || true; echo "$CRON_LINE"; } | crontab -
@@ -95,11 +100,13 @@ CRON_LINE="0 2 * * * cd $REPO && deploy/backup.sh >> backups/backup.log 2>&1"
 DOMAIN="$(grep -E '^APP_DOMAIN=' .env | tail -n1 | cut -d= -f2- | tr -d '\r')"
 cat <<MSG
 
-Hoan tat. Cac buoc tiep theo:
-1. Dien INITIAL_ADMIN_USERNAME va INITIAL_ADMIN_PASSWORD trong .env (nano .env), roi tao tai khoan Giam doc:
+Hoan tat. Cac buoc tiep theo (chay bang user $OWNER, KHONG dung sudo):
+0. Dang xuat roi dang nhap lai SSH mot lan de user nhan quyen nhom docker.
+1. Dien INITIAL_ADMIN_USERNAME va INITIAL_ADMIN_PASSWORD trong .env (nano .env), roi:
    $COMPOSE up -d app
    $COMPOSE exec app python -m app.cli.create_admin
-2. XOA hai dong INITIAL_ADMIN_USERNAME / INITIAL_ADMIN_PASSWORD khoi .env sau khi tao xong.
+2. XOA hai dong INITIAL_ADMIN_USERNAME / INITIAL_ADMIN_PASSWORD khoi .env, roi nap lai cau hinh:
+   $COMPOSE up -d app
 3. Kiem tra: curl https://$DOMAIN/health  (mong doi {"status":"ok",...})
 4. Dang nhap thu tai https://$DOMAIN/login, sau do tao tai khoan Ke toan trong dashboard.
 5. Dang ky Webhook tren Meta va gui tin thu tu tai khoan tester.

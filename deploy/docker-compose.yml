@@ -1,5 +1,7 @@
 # Run from the repo root:
 #   docker compose -f deploy/docker-compose.yml --env-file .env up -d --build
+name: bestone
+
 services:
   app:
     build:
@@ -67,6 +69,7 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/24
+          ip_range: 172.28.0.128/25
 
 volumes:
   pgdata:

@@ -1,0 +1,6 @@
+# Test-only override: publishes Postgres on localhost so pytest can use TEST_DATABASE_URL.
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.test.yml --env-file .env up -d db
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
