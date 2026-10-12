@@ -99,3 +99,12 @@ def test_bootstrap_fixes_ownership_and_timezone() -> None:
     assert 'chown "$OWNER:$OWNER" .env' in text
     assert "timedatectl set-timezone Asia/Ho_Chi_Minh" in text
     assert "usermod -aG docker" in text
+
+
+def test_backup_passes_s3_credentials_by_name_only() -> None:
+    text = (DEPLOY / "backup.sh").read_text(encoding="utf-8")
+    assert 'AWS_SECRET_ACCESS_KEY="' not in text.replace('export AWS_SECRET_ACCESS_KEY="', "")
+    assert 'AWS_ACCESS_KEY_ID="' not in text.replace('export AWS_ACCESS_KEY_ID="', "")
+    assert "-e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY" in text
+    assert "AWS_REQUEST_CHECKSUM_CALCULATION=when_required" in text
+    assert "AWS_RESPONSE_CHECKSUM_VALIDATION=when_required" in text

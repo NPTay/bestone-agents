@@ -57,10 +57,13 @@ prune "$BACKUP_DIR/weekly" 4
 # Off-site copy (only when all S3 settings are present).
 if [ -n "$BACKUP_S3_ENDPOINT" ] && [ -n "$BACKUP_S3_BUCKET" ] \
   && [ -n "$BACKUP_S3_ACCESS_KEY" ] && [ -n "$BACKUP_S3_SECRET_KEY" ]; then
+  export AWS_ACCESS_KEY_ID="$BACKUP_S3_ACCESS_KEY"
+  export AWS_SECRET_ACCESS_KEY="$BACKUP_S3_SECRET_KEY"
   docker run --rm \
-    -e AWS_ACCESS_KEY_ID="$BACKUP_S3_ACCESS_KEY" \
-    -e AWS_SECRET_ACCESS_KEY="$BACKUP_S3_SECRET_KEY" \
+    -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
     -e AWS_DEFAULT_REGION=us-east-1 \
+    -e AWS_REQUEST_CHECKSUM_CALCULATION=when_required \
+    -e AWS_RESPONSE_CHECKSUM_VALIDATION=when_required \
     -v "$PWD/$BACKUP_DIR:/backups:ro" \
     amazon/aws-cli s3 cp "/backups/$(basename "$FILE")" \
     "s3://$BACKUP_S3_BUCKET/$(basename "$FILE")" \

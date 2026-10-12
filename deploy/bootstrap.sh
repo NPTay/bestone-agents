@@ -57,7 +57,7 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
 fi
 systemctl enable --now docker
 if [ -n "$NEW_USER" ]; then usermod -aG docker "$NEW_USER"; fi
-OWNER="${SUDO_USER:-root}"
+OWNER="${SUDO_USER:-${NEW_USER:-root}}"
 if [ "$OWNER" != "root" ]; then usermod -aG docker "$OWNER"; fi
 
 echo "==> 3. File .env"
