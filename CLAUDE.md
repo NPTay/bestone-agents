@@ -58,7 +58,9 @@ Docker / VPS (chạy ở thư mục gốc repo, cần file `.env` tạo từ `.e
 ## Trạng thái
 - Giai đoạn 0 (khung + đăng nhập Dashboard): code xong trên nhánh `phase0-skeleton-auth`; test xanh (128 test pass, ruff và mypy sạch).
 - CHƯA kiểm chứng chạy thật bằng Docker (máy dev chưa có Docker).
-- Việc còn lại: chạy thử Docker theo `docs/06`, xác nhận quyền của vai trò Kế toán, sau đó sang Giai đoạn 1.
+- Việc còn lại: chạy thử Docker theo `docs/06`.
+- Vai trò Kế toán (`ke_toan`): code có sẵn nhưng CHƯA kích hoạt — Giám đốc quyết định chưa dùng (12/10/2026). Không tạo tài khoản Kế toán, không làm thêm tính năng cho vai trò này cho đến khi Giám đốc yêu cầu.
+- Giai đoạn 1 (A1 + A2 + Dashboard duyệt bài): đang làm trên nhánh `phase1-content-pipeline`.
 
 ## Cách làm việc với người dùng
 - Người dùng (Giám đốc) không phải lập trình viên. Giải thích ngắn gọn, đưa lệnh copy-paste được.
