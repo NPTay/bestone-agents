@@ -9,3 +9,4 @@ backups/
 .superpowers/
 Picture/
 Tai Lieu/
+*.egg-info/
