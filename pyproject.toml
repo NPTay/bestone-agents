@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "respx", "ruff", "mypy"]
+dev = ["pytest", "respx", "ruff", "mypy", "pyyaml", "types-PyYAML"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

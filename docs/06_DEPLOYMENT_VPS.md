@@ -34,7 +34,9 @@ SEARCH_API_KEY=
 POSTGRES_DB=bestone
 POSTGRES_USER=bestone_app
 POSTGRES_PASSWORD=
-DATABASE_URL=postgresql+psycopg://bestone_app:${POSTGRES_PASSWORD}@db:5432/bestone
+# DATABASE_URL is set by docker compose (deploy/docker-compose.yml) from POSTGRES_*.
+# For local non-Docker runs set it here, e.g. postgresql+psycopg://user:pass@localhost:5432/bestone
+DATABASE_URL=
 SESSION_SECRET_KEY=
 SESSION_COOKIE_NAME=bestone_session
 SESSION_MAX_AGE_SECONDS=28800
@@ -51,6 +53,8 @@ TRUSTED_PROXY_IPS=172.28.0.10
 AUTONOMY_LEVEL=draft_only
 TZ=Asia/Ho_Chi_Minh
 ```
+Lưu ý: Docker Compose không nội suy `${...}` trong `env_file`, nên `DATABASE_URL` của `app` được đặt trong `environment:` của compose từ `POSTGRES_*`; chạy compose với `--env-file .env` từ thư mục gốc repo.
+
 `INITIAL_ADMIN_*` chỉ dùng 1 lần cho `app/cli/create_admin.py`, xóa khỏi `.env` sau khi tạo tài khoản (theo `docs/08`).
 
 ## Quy trình triển khai lần đầu (Claude Code viết thành script `deploy/bootstrap.sh` và hướng dẫn người dùng chạy)
