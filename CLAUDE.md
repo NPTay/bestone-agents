@@ -30,14 +30,26 @@ Bối cảnh: doanh nghiệp B2B siêu tinh gọn, không thêm nhân sự. Ưu 
 7. **Ngôn ngữ:** Giao diện, prompt, bài đăng: tiếng Việt. Mã nguồn, tên biến, comment: tiếng Anh.
 8. **Kiểm thử trước khi bàn giao:** Mỗi giai đoạn phải có test chạy được và nghiệm thu theo `docs/07`.
 
-## Lệnh thường dùng (Claude Code cập nhật khi tạo xong)
-- Chạy local: `docker compose up --build`
-- Test: `pytest -q`
-- Migrate DB (Postgres trong container `db`): `alembic upgrade head` (tự chạy khi `app` khởi động)
-- Seed knowledge: `python -m app.knowledge.ingest`
-- Tạo tài khoản Giám đốc lần đầu: `python -m app.cli.create_admin`
-- Đặt lại mật khẩu: `python -m app.cli.reset_password`
+## Lệnh thường dùng
+Dev local (Windows, chạy ở thư mục gốc repo):
+- Tạo môi trường: `py -3.12 -m venv .venv` rồi `.venv/Scripts/python -m pip install -e ".[dev]"`
+- Test: `.venv/Scripts/python -m pytest -q`
+- Lint: `.venv/Scripts/ruff check .`; kiểm tra kiểu: `.venv/Scripts/mypy app`
+- Test cần Postgres thật: bật `db` bằng `deploy/docker-compose.test.yml` (xem file), đặt `TEST_DATABASE_URL`
+
+Docker / VPS (chạy ở thư mục gốc repo, cần file `.env` tạo từ `.env.example`):
+- Cài VPS lần đầu: `sudo deploy/bootstrap.sh [ten_user_moi]`
+- Chạy/cập nhật: `docker compose -f deploy/docker-compose.yml --env-file .env up -d --build` (migration `alembic upgrade head` tự chạy trong entrypoint)
+- Tạo tài khoản Giám đốc lần đầu: `docker compose -f deploy/docker-compose.yml --env-file .env exec app python -m app.cli.create_admin`
+- Đặt lại mật khẩu: `docker compose -f deploy/docker-compose.yml --env-file .env exec app python -m app.cli.reset_password --username <ten>`
+- Kiểm tra nạp knowledge: `docker compose -f deploy/docker-compose.yml --env-file .env exec app python -m app.knowledge.ingest`
 - Backup DB thủ công: `deploy/backup.sh`
+- Quay lại phiên bản cũ: xem `deploy/rollback.md`
+
+## Trạng thái
+- Giai đoạn 0 (khung + đăng nhập Dashboard): code xong trên nhánh `phase0-skeleton-auth`; test xanh (121 test pass, ruff và mypy sạch).
+- CHƯA kiểm chứng chạy thật bằng Docker (máy dev chưa có Docker).
+- Việc còn lại: chạy thử Docker theo `docs/06`, xác nhận quyền của vai trò Kế toán, sau đó sang Giai đoạn 1.
 
 ## Cách làm việc với người dùng
 - Người dùng (Giám đốc) không phải lập trình viên. Giải thích ngắn gọn, đưa lệnh copy-paste được.
