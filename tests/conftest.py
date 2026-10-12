@@ -1,6 +1,7 @@
 import os
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("SESSION_SECRET_KEY", "test-secret")
@@ -11,10 +12,11 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import Engine, orm  # noqa: E402
 
 from app import clock  # noqa: E402
+from app.auth.passwords import hash_password
 from app.config import get_settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.db.models import Role, User  # noqa: E402
-from app.db.session import get_db, make_engine  # noqa: E402
+from app.db.session import _sessionmaker, get_db, make_engine  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 
@@ -23,6 +25,20 @@ def engine() -> Iterator[Engine]:
     eng = make_engine("sqlite://")
     Base.metadata.create_all(eng)
     yield eng
+    eng.dispose()
+
+
+@pytest.fixture
+def db_url_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Engine]:
+    """Point DATABASE_URL at a temp-file SQLite DB so CLIs open their own session."""
+    eng = make_engine(f"sqlite:///{tmp_path / 'cli.db'}")
+    Base.metadata.create_all(eng)
+    monkeypatch.setenv("DATABASE_URL", str(eng.url))
+    get_settings.cache_clear()
+    _sessionmaker.cache_clear()
+    yield eng
+    get_settings.cache_clear()
+    _sessionmaker.cache_clear()
     eng.dispose()
 
 
@@ -54,10 +70,9 @@ def make_user(db: orm.Session) -> Callable[..., User]:
         role: Role = Role.giam_doc,
         is_active: bool = True,
     ) -> User:
-        # TODO(Task 4): switch to hash_password(password) once password hashing exists.
         user = User(
             username=username,
-            password_hash="unhashed:" + password,
+            password_hash=hash_password(password),
             role=role,
             is_active=is_active,
         )

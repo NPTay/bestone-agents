@@ -23,6 +23,11 @@ def _sessionmaker() -> orm.sessionmaker[orm.Session]:
     return orm.sessionmaker(bind=engine, expire_on_commit=False)
 
 
+def open_session() -> orm.Session:
+    """Open a standalone session (for CLIs/jobs outside FastAPI); use as a context manager."""
+    return _sessionmaker()()
+
+
 def get_db() -> Iterator[orm.Session]:
     """FastAPI dependency yielding a DB session (built lazily from settings)."""
     session = _sessionmaker()()
