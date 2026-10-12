@@ -147,7 +147,7 @@ def test_backup_warns_via_telegram_and_fails_on_upload_error() -> None:
     assert "warn_telegram" in text and "--data-urlencode" in text
     assert "--max-time 10" in text
     assert "S3 upload FAILED" in text
-    assert "echo \"$TELEGRAM_BOT_TOKEN" not in text
+    assert 'echo "$TELEGRAM_BOT_TOKEN' not in text
 
 
 def test_bootstrap_warns_when_offsite_backup_unset() -> None:

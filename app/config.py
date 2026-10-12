@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     # Anthropic
     ANTHROPIC_API_KEY: str = ""
+    LLM_TIMEOUT_SECONDS: int = 120
     MODEL_QUALITY: str = "claude-sonnet-5-5"
     MODEL_FAST: str = "claude-haiku-5-5"
     DAILY_COST_LIMIT_USD: str = ""

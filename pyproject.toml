@@ -19,6 +19,9 @@ dependencies = [
     "argon2-cffi",
     "httpx",
     "tzdata",
+    "anthropic>=1.0",
+    "feedparser",
+    "apscheduler>=3.10,<4",
 ]
 
 [project.optional-dependencies]

@@ -76,6 +76,12 @@ def db(engine: Engine) -> Iterator[orm.Session]:
 
 
 @pytest.fixture
+def db_factory(engine: Engine) -> Callable[[], orm.Session]:
+    """Factory of sessions bound to the same test engine as `db` / `client`."""
+    return orm.sessionmaker(bind=engine, expire_on_commit=False)
+
+
+@pytest.fixture
 def client(db: orm.Session) -> Iterator[TestClient]:
     get_settings.cache_clear()
     app = create_app()
