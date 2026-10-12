@@ -35,10 +35,10 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
 
 [tool.mypy]
 python_version = "3.12"
 strict = true
-filterwarnings = [
-    "ignore:Using `httpx` with `starlette.testclient` is deprecated:DeprecationWarning",
-]
