@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from app.guardrails.rules import check_rules, extract_numbers
+from app.guardrails.rules import check_rules, extract_numbers, kb_number_set
 from app.llm.prompts import PROJECT_ROOT, load_knowledge
 
 KB = load_knowledge()["bestone_knowledge_base.md"]
@@ -171,3 +171,81 @@ def test_no_sources_no_kb_refs() -> None:
 )
 def test_extract_numbers(text: str, expected: set[str]) -> None:
     assert extract_numbers(text) == expected
+
+
+@pytest.mark.parametrize(
+    "txt",
+    [
+        "Chỉ 368.000đ/m2.",
+        "Chỉ 368.000VNĐ/m2.",
+        "Chỉ 650.000/m2.",
+        "Chỉ 300.000đ.",
+        "Chỉ 5 tr/m2.",
+        "Chống thấm 100%.",
+        "Không thấm 100%.",
+        "100% chống thấm.",
+        "Bền 20 NĂM.",
+        "Chống thấm 30 Năm.",
+        "Đạt TCVN9065.",
+        "giá368.000",
+        "Trọn đời công trình.",
+        "Bền vĩnh cửu.",
+        "Mãi mãi kín nước.",
+        "Sản phẩm số một.",
+    ],
+)
+def test_review_round1_blocked(txt: str) -> None:
+    assert _checks(body=SAMPLE["body"] + " " + txt) & {"forbidden_terms", "facts"}
+
+
+@pytest.mark.parametrize("txt", ["Chỉ 368.000đ/m2.", "Chỉ 650.000/m2.", "Chỉ 5 tr/m2."])
+def test_prices_are_forbidden_terms(txt: str) -> None:
+    assert "forbidden_terms" in _checks(body=SAMPLE["body"] + " " + txt)
+
+
+@pytest.mark.parametrize("txt", ["Bền 20 NĂM.", "Chống thấm 30 Năm."])
+def test_uppercase_nam_flags_facts_and_terms(txt: str) -> None:
+    got = _checks(body=SAMPLE["body"] + " " + txt)
+    assert "facts" in got
+
+
+@pytest.mark.parametrize("tag", ["#BảoHành20Năm", "#GiáRẻ"])
+def test_forbidden_in_hashtags(tag: str) -> None:
+    assert "forbidden_terms" in _checks(hashtags=[*SAMPLE["hashtags"], tag])
+
+
+@pytest.mark.parametrize("phrase", ["100% khoáng thiên nhiên", "100% nguyên liệu tự nhiên"])
+def test_100_percent_natural_phrases_ok(phrase: str) -> None:
+    assert "forbidden_terms" not in _checks(body=SAMPLE["body"] + f" Làm từ {phrase}.")
+
+
+@pytest.mark.parametrize(
+    "hotline", ["+84 904 834 577", "+84904834577", "0904 834 577", "0904.834.577"]
+)
+def test_hotline_variants_excluded_from_facts(hotline: str) -> None:
+    assert extract_numbers(f"gọi {hotline}") == set()
+    assert _checks(body=SAMPLE["body"] + f" Gọi {hotline}.") == set()
+
+
+@pytest.mark.parametrize(
+    "txt",
+    [
+        "Phát thải 1,22 kg CO2eq/m2.",
+        "So với 20,25.",
+        "Vết nứt 0,2 đến 0,4 mm.",
+        "Trộn 6% khối lượng xi măng.",
+        "Sau 120 ngày.",
+        "11/30 công ty.",
+        "Túi 20 kg.",
+        "Bao 1.000 kg.",
+        "Cường độ 39 N/mm2.",
+        "Áp lực 1 MPa.",
+        "Trong 90 ngày.",
+    ],
+)
+def test_kb_facts_produce_no_findings(txt: str) -> None:
+    assert _checks(body=SAMPLE["body"] + " " + txt) == set()
+
+
+def test_kb_price_numbers_not_whitelisted() -> None:
+    assert not {"368000", "525000", "650000"} & kb_number_set(KB)

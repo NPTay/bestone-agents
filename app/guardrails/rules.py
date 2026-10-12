@@ -34,7 +34,7 @@ def _norm(text: str) -> str:
 
 # ---------------------------------------------------------------- numbers
 
-_HOTLINE_RE = re.compile(r"0904[\s.]?834[\s.]?577")
+_HOTLINE_RE = re.compile(r"(?<!\d)(?:\+?84[\s.]?|0)904[\s.]?834[\s.]?577(?!\d)")
 _HASHTAG_RE = re.compile(r"#\w+")
 # A digit run is a number unless glued to a preceding letter/digit/")" (mm2, SiO2, Ca(OH)2).
 _NUMBER_RE = re.compile(r"(?<![\w)])\d+(?:[.,]\d+)*(\s*năm(?!\w))?")
@@ -52,7 +52,7 @@ def _canonical(token: str) -> str:
 
 
 def _ordered_numbers(text: str) -> list[str]:
-    text = unicodedata.normalize("NFC", text)
+    text = _norm(text)
     text = _HASHTAG_RE.sub(" ", _HOTLINE_RE.sub(" ", text))
     seen: dict[str, None] = {}
     for match in _NUMBER_RE.finditer(text):
@@ -71,7 +71,9 @@ def extract_numbers(text: str) -> set[str]:
 
 
 def kb_number_set(kb_text: str) -> set[str]:
-    return extract_numbers(kb_text)
+    # Price-table lines (VND) must not whitelist amounts: prices never belong in posts.
+    lines = [ln for ln in kb_text.splitlines() if "vnd" not in ln.casefold()]
+    return extract_numbers("\n".join(lines))
 
 
 def _check_facts(texts: str, kb_text: str, source_texts: list[str]) -> list[RuleFinding]:
@@ -92,41 +94,66 @@ _SENTENCE_SPLIT = re.compile(r"[!?\n]+|\.(?!\d)|(?<!\d)\.")
 _CONTEXT_YEARS = re.compile(r"\d+\s*năm(?!\w)")
 _YEAR_CONTEXT = re.compile(r"bảo hành|tuổi thọ|độ bền|sử dụng được")
 
+_L = r"(?<![^\W\d])"  # not preceded by a letter (digits and punctuation allowed)
+_R = r"(?![^\W\d])"  # not followed by a letter
+_PRICE_UNIT = r"(?:đ(?![^\W\d])|vnd|vnđ|k\b|/\s*m|đồng|tr\b|triệu)"
+
 _TERM_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("giá", re.compile(r"(?<!\w)giá(?!\w)")),
-    ("VND", re.compile(r"(?<!\w)(?:vnd|vnđ)(?!\w)")),
-    ("đồng/m", re.compile(r"(?<!\w)đồng\s*/\s*m")),
-    ("đ/m2", re.compile(r"(?<!\w)đ\s*/\s*m")),
-    ("triệu đồng", re.compile(r"(?<!\w)triệu\s+đồng(?!\w)")),
-    ("TCVN", re.compile(r"(?<!\w)tcvn(?!\w)")),
+    ("giá", re.compile(rf"{_L}giá{_R}")),
+    ("VND", re.compile(rf"{_L}(?:vnd|vnđ){_R}")),
+    ("đồng/m", re.compile(rf"{_L}đồng\s*/\s*m")),
+    ("đ/m2", re.compile(rf"{_L}đ\s*/\s*m")),
+    ("triệu đồng", re.compile(rf"{_L}triệu\s+đồng{_R}")),
+    (
+        "số tiền",
+        re.compile(rf"(?<![\w.])(?:\d{{1,3}}(?:[.\s]\d{{3}})+\s*{_PRICE_UNIT}|\d+\s*(?:k|tr)\b)"),
+    ),
+    ("TCVN", re.compile(rf"(?<!\w)tcvn{_R}")),
     ("cam kết", re.compile(r"(?<!\w)cam kết(?!\w)")),
-    ("đảm bảo 100%", re.compile(r"(?<!\w)đảm bảo\s*100\s*%")),
     ("tuyệt đối", re.compile(r"(?<!\w)tuyệt đối(?!\w)")),
     ("hoàn hảo", re.compile(r"(?<!\w)hoàn hảo(?!\w)")),
     ("số 1", re.compile(r"(?<!\w)số\s*1(?!\w|[.,]\d)")),
+    ("số một", re.compile(r"(?<!\w)số một(?!\w)")),
     ("đột phá", re.compile(r"(?<!\w)đột phá(?!\w)")),
     ("cách mạng", re.compile(r"(?<!\w)cách mạng(?!\w)")),
-    ("100% không thấm", re.compile(r"100\s*%\s*không thấm")),
+    ("trọn đời", re.compile(r"(?<!\w)trọn đời(?!\w)")),
+    ("vĩnh cửu", re.compile(r"(?<!\w)vĩnh cửu(?!\w)")),
+    ("mãi mãi", re.compile(r"(?<!\w)mãi mãi(?!\w)")),
     ("vĩnh viễn", re.compile(r"(?<!bán )(?<!\w)vĩnh viễn(?!\w)")),
 ]
+_HUNDRED_PERCENT = re.compile(r"100\s*%(?!\s*(?:khoáng thiên nhiên|nguyên liệu tự nhiên))")
+_PREFIX = "Cụm từ không được phép trong bài đăng: "
 
 
-def _check_forbidden(text: str) -> list[RuleFinding]:
-    norm = _norm(text)
-    found: dict[str, None] = {}
+def _split_hashtag(tag: str) -> str:
+    """Turn '#BảoHành20Năm' into 'Bảo Hành 20 Năm' so word-based rules apply."""
+    out: list[str] = []
+    for ch in tag.lstrip("#"):
+        if out:
+            prev = out[-1]
+            if (prev.islower() and ch.isupper()) or (prev.isdigit() != ch.isdigit()):
+                out.append(" ")
+        out.append(ch)
+    return "".join(out)
+
+
+def _check_forbidden(text: str, hashtags: list[str]) -> list[RuleFinding]:
+    text = _HOTLINE_RE.sub(" ", unicodedata.normalize("NFC", text))
+    norm = _norm("\n".join([text, *(_split_hashtag(t) for t in hashtags)]))
+    found: dict[str, str] = {}
     for sentence in _SENTENCE_SPLIT.split(norm):
         if "bảo hành" in sentence and re.search(r"\d", sentence):
-            found.setdefault("bảo hành <số>", None)
+            found.setdefault("bảo hành <số>", _PREFIX + "bảo hành <số>")
         if _CONTEXT_YEARS.search(sentence) and _YEAR_CONTEXT.search(sentence):
-            found.setdefault("<số> năm (tuổi thọ/bảo hành)", None)
+            label = "<số> năm (tuổi thọ/bảo hành)"
+            found.setdefault(label, _PREFIX + label)
     cleaned = _ALLOWED_PHRASES.sub(" ", norm)
     for label, pattern in _TERM_PATTERNS:
         if pattern.search(cleaned):
-            found.setdefault(label, None)
-    return [
-        RuleFinding("forbidden_terms", f"Cụm từ không được phép trong bài đăng: {label}")
-        for label in found
-    ]
+            found.setdefault(label, _PREFIX + label)
+    if _HUNDRED_PERCENT.search(norm):
+        found["100%"] = "Khẳng định 100% không có trong tài liệu"
+    return [RuleFinding("forbidden_terms", message) for message in found.values()]
 
 
 # ------------------------------------------------------------------ format
@@ -205,7 +232,7 @@ def check_rules(
     text = "\n".join([title, body, cta])
     return [
         *_check_facts(text, kb_text, source_texts),
-        *_check_forbidden(text),
+        *_check_forbidden(text, hashtags),
         *_check_format(body, hashtags, cta),
         *_check_sources(sources, kb_refs),
     ]
