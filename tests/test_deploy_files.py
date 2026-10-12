@@ -81,10 +81,17 @@ def test_entrypoint_command() -> None:
     assert "--proxy-headers" in text and '"$TRUSTED_PROXY_IPS"' in text
 
 
-def test_test_override_binds_db_to_localhost_only() -> None:
+def test_test_compose_is_isolated_throwaway_db() -> None:
     text = (DEPLOY / "docker-compose.test.yml").read_text(encoding="utf-8")
     data: dict[str, Any] = yaml.safe_load(text)
-    assert data["services"]["db"]["ports"] == ["127.0.0.1:5432:5432"]
+    assert data["name"] == "bestone-test"
+    assert list(data["services"]) == ["db_test"]
+    svc = data["services"]["db_test"]
+    assert svc["ports"] == ["127.0.0.1:5433:5432"]
+    assert svc["environment"]["POSTGRES_DB"] == "bestone_test"
+    assert "volumes" not in svc
+    assert "volumes" not in data
+    assert svc["tmpfs"] == ["/var/lib/postgresql/data"]
 
 
 def test_compose_name_and_ip_range() -> None:

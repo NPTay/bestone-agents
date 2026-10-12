@@ -11,6 +11,7 @@ os.environ.setdefault("APP_ENV", "dev")
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import Engine, orm  # noqa: E402
+from sqlalchemy.engine import make_url  # noqa: E402
 
 from app import clock  # noqa: E402
 from app.auth.passwords import hash_password
@@ -21,10 +22,23 @@ from app.db.session import _sessionmaker, get_db, make_engine  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 
+def _assert_test_database(url: str) -> None:
+    """Abort the run unless the DB name contains 'test' (the suite runs drop_all on it)."""
+    database = make_url(url).database or ""
+    if "test" not in database:
+        pytest.exit(
+            "TEST_DATABASE_URL phải trỏ tới DB có tên chứa 'test' "
+            f"(hiện là '{database}'). Bộ test sẽ xóa toàn bộ bảng.",
+            returncode=2,
+        )
+
+
 @pytest.fixture
 def engine() -> Iterator[Engine]:
     """In-memory SQLite by default; real Postgres when TEST_DATABASE_URL is set."""
     test_url = os.environ.get("TEST_DATABASE_URL")
+    if test_url:
+        _assert_test_database(test_url)
     eng = make_engine(test_url or "sqlite://")
     if test_url:
         Base.metadata.drop_all(eng)  # clean slate in case a previous run crashed
