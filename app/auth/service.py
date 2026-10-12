@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import orm, select
+from sqlalchemy import case, or_, orm, select, update
 
 from app import clock
 from app.audit import write_audit
@@ -39,6 +39,7 @@ def authenticate(db: orm.Session, username: str, password: str) -> AuthResult:
 
     now = clock.utcnow()
     if user.locked_until is not None and user.locked_until > now:
+        dummy_verify()  # keep timing aligned with the other paths; password not checked
         return AuthResult(error="locked", locked_until=user.locked_until)
 
     password_ok = verify_password(user.password_hash, password)
@@ -46,7 +47,7 @@ def authenticate(db: orm.Session, username: str, password: str) -> AuthResult:
         return AuthResult(error="invalid")
 
     if not password_ok:
-        _register_failure(db, user, now)
+        register_failure(db, user, now)
         return AuthResult(error="invalid")
 
     user.failed_attempts = 0
@@ -58,24 +59,40 @@ def authenticate(db: orm.Session, username: str, password: str) -> AuthResult:
     return AuthResult(user=user)
 
 
-def _register_failure(db: orm.Session, user: User, now: datetime) -> None:
-    if user.last_failed_at is None or now - user.last_failed_at > FAILURE_WINDOW:
-        user.failed_attempts = 0
-    user.failed_attempts += 1
-    user.last_failed_at = now
-    locked = user.failed_attempts >= MAX_FAILED_ATTEMPTS
-    if locked:
-        user.locked_until = now + LOCK_DURATION
-        write_audit(
-            db,
-            user.id,
-            "account_locked",
-            "user",
-            str(user.id),
-            {"failed_attempts": user.failed_attempts},
+def register_failure(db: orm.Session, user: User, now: datetime) -> None:
+    """Record a failed login atomically in the DB (safe under parallel guesses)."""
+    cutoff = now - FAILURE_WINDOW
+    count = db.execute(
+        update(User)
+        .where(User.id == user.id)
+        .values(
+            failed_attempts=case(
+                (or_(User.last_failed_at.is_(None), User.last_failed_at <= cutoff), 1),
+                else_=User.failed_attempts + 1,
+            ),
+            last_failed_at=now,
         )
+        .returning(User.failed_attempts)
+        .execution_options(synchronize_session=False)
+    ).scalar_one()
+    newly_locked = False
+    if count >= MAX_FAILED_ATTEMPTS:
+        locked_until = now + LOCK_DURATION
+        result = db.execute(
+            update(User)
+            .where(User.id == user.id)
+            .where(or_(User.locked_until.is_(None), User.locked_until <= now))
+            .values(locked_until=locked_until)
+            .execution_options(synchronize_session=False)
+        )
+        newly_locked = result.rowcount == 1  # type: ignore[attr-defined]
+        if newly_locked:
+            write_audit(
+                db, user.id, "account_locked", "user", str(user.id), {"failed_attempts": count}
+            )
     db.commit()
-    if locked and user.locked_until is not None:
+    db.refresh(user)
+    if newly_locked and user.locked_until is not None:
         send_alert(
             db,
             "warn",

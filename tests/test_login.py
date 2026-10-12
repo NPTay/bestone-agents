@@ -225,3 +225,33 @@ def test_password_never_logged(
     login(client, "gd", "BiMat-XYZ-123")
     login(client, "gd", "Matkhau#2026")
     assert "BiMat-XYZ-123" not in caplog.text
+
+
+def test_locked_login_runs_dummy_verify_not_password_check(
+    client: TestClient, make_user: MakeUser, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.auth.service as service
+
+    make_user(username="gd")
+    for _ in range(5):
+        login(client, "gd", "x")
+    dummy: list[int] = []
+    real: list[int] = []
+    monkeypatch.setattr(service, "dummy_verify", lambda: dummy.append(1))
+    monkeypatch.setattr(service, "verify_password", lambda h, p: real.append(1) or True)
+    r = login(client, "gd", "Matkhau#2026")
+    assert "Tài khoản tạm khóa" in r.text
+    assert dummy == [1] and real == []
+
+
+def test_failure_at_exact_window_edge_restarts(
+    client: TestClient, make_user: MakeUser, frozen_now: FrozenNow, db: orm.Session
+) -> None:
+    make_user(username="gd")
+    for _ in range(4):
+        login(client, "gd", "x")
+    frozen_now.advance(timedelta(minutes=15))
+    login(client, "gd", "x")
+    db.expire_all()
+    user = db.scalar(select(User))
+    assert user is not None and user.failed_attempts == 1 and user.locked_until is None
