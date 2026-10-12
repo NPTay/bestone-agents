@@ -1,11 +1,12 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     Enum,
     Float,
     ForeignKey,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -34,7 +36,7 @@ def _enum(name: str, *values: str) -> Enum:
 TOPICS = ("ha_tang", "quy_dinh", "su_co_tham", "du_an_moi", "cong_nghe", "esg", "khac")
 POST_STATUSES = (
     "idea", "draft", "guardrail_failed", "pending_approval", "approved",
-    "scheduled", "published", "failed",
+    "scheduled", "published", "failed", "rejected",
 )  # fmt: skip
 
 
@@ -77,11 +79,18 @@ class ResearchItem(TimestampMixin, Base):
     relevance_score: Mapped[int] = mapped_column(Integer, default=0)  # 0-100
     fetched_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     used_in_post_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("posts.id"))
+    angle_suggestion: Mapped[str | None] = mapped_column(Text)
+    score_reasons: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    risk_flags: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class Post(TimestampMixin, Base):
     __tablename__ = "posts"
-    __table_args__ = (Index("ix_posts_status_scheduled_at", "status", "scheduled_at"),)
+    __table_args__ = (
+        Index("ix_posts_status_scheduled_at", "status", "scheduled_at"),
+        UniqueConstraint("planned_for", "pillar", name="uq_posts_planned_pillar"),
+    )
 
     pillar: Mapped[str | None] = mapped_column(String(100))
     title: Mapped[str | None] = mapped_column(String(500))
@@ -89,7 +98,7 @@ class Post(TimestampMixin, Base):
     hashtags: Mapped[list[str]] = mapped_column(JSONType, default=list)
     image_brief: Mapped[str | None] = mapped_column(Text)
     image_url: Mapped[str | None] = mapped_column(String(2000))
-    sources: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    sources: Mapped[list[dict[str, str]]] = mapped_column(JSONType, default=list)
     kb_refs: Mapped[list[str]] = mapped_column(JSONType, default=list)
     status: Mapped[str] = mapped_column(_enum("post_status", *POST_STATUSES), default="draft")
     sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -99,6 +108,14 @@ class Post(TimestampMixin, Base):
     fb_post_id: Mapped[str | None] = mapped_column(String(100))
     approved_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id"))
     approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    cta: Mapped[str | None] = mapped_column(Text)
+    alt_opening: Mapped[str | None] = mapped_column(Text)
+    sensitive_reasons: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    rejection_reason: Mapped[str | None] = mapped_column(Text)
+    planned_for: Mapped[date | None] = mapped_column(Date)
+    research_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("research_items.id", name="fk_posts_research_item_id_research_items")
+    )
 
 
 class PostMetric(TimestampMixin, Base):
