@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -39,6 +41,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             {"message": detail},
             status_code=exc.status_code,
             headers=exc.headers,
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(request: Request, exc: RequestValidationError) -> Response:
+        if request.url.path.startswith(("/admin_api/", "/webhook/")):
+            return JSONResponse({"detail": jsonable_encoder(exc.errors())}, status_code=422)
+        return templates.TemplateResponse(
+            request, "error.html", {"message": "Dữ liệu không hợp lệ"}, status_code=422
         )
 
     return app

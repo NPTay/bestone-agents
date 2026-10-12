@@ -53,6 +53,8 @@ TRUSTED_PROXY_IPS=172.28.0.10
 AUTONOMY_LEVEL=draft_only
 TZ=Asia/Ho_Chi_Minh
 ```
+`APP_DOMAIN` là bắt buộc: nếu để trống, `docker compose` dừng ngay với thông báo lỗi (Caddy không thể chạy với tên miền rỗng). Chạy thử trên máy local: đặt `APP_DOMAIN=localhost` (Caddy tự cấp chứng chỉ nội bộ, truy cập `https://localhost`, trình duyệt sẽ cảnh báo chứng chỉ tự ký). Caddy cũng gửi các header bảo mật (HSTS, nosniff, X-Frame-Options DENY, Referrer-Policy same-origin).
+
 Lưu ý: Docker Compose không nội suy `${...}` trong `env_file`, nên `DATABASE_URL` của `app` được đặt trong `environment:` của compose từ `POSTGRES_*`; chạy compose với `--env-file .env` từ thư mục gốc repo.
 
 `INITIAL_ADMIN_*` chỉ dùng 1 lần cho `app/cli/create_admin.py`, xóa khỏi `.env` sau khi tạo tài khoản (theo `docs/08`).
@@ -77,7 +79,7 @@ Lưu ý: Docker Compose không nội suy `${...}` trong `env_file`, nên `DATABA
 
 ## Backup (bắt buộc — DB chứa lead khách hàng)
 - `deploy/backup.sh`: `pg_dump -Fc` hằng ngày 02:00 (cron của host hoặc job A0), nén, giữ 7 bản ngày + 4 bản tuần trên VPS.
-- Đẩy bản sao ra object storage S3-compatible bên ngoài VPS (`BACKUP_S3_*`). Không chỉ lưu trên cùng VPS.
+- Đẩy bản sao ra object storage S3-compatible bên ngoài VPS (`BACKUP_S3_*`). Không chỉ lưu trên cùng VPS. `bootstrap.sh` in cảnh báo nếu `BACKUP_S3_*` còn trống; khi bỏ qua upload hoặc upload lỗi, `backup.sh` gửi cảnh báo Telegram (cần `TELEGRAM_BOT_TOKEN` và `TELEGRAM_ADMIN_CHAT_ID`); upload lỗi làm script thoát mã khác 0.
 - Mỗi tháng thử khôi phục 1 lần vào DB tạm (`pg_restore`) và ghi kết quả vào `audit_log`.
 - Thêm snapshot VPS của nhà cung cấp nếu có (tùy chọn).
 

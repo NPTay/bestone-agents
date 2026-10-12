@@ -6,7 +6,7 @@
 name: bestone-test
 services:
   db_test:
-    image: postgres:16
+    image: postgres:16.4
     environment:
       POSTGRES_DB: bestone_test
       POSTGRES_USER: test

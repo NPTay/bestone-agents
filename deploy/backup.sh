@@ -14,8 +14,17 @@ BACKUP_S3_ENDPOINT="$(env_get BACKUP_S3_ENDPOINT)"
 BACKUP_S3_BUCKET="$(env_get BACKUP_S3_BUCKET)"
 BACKUP_S3_ACCESS_KEY="$(env_get BACKUP_S3_ACCESS_KEY)"
 BACKUP_S3_SECRET_KEY="$(env_get BACKUP_S3_SECRET_KEY)"
+TELEGRAM_BOT_TOKEN="$(env_get TELEGRAM_BOT_TOKEN)"
+TELEGRAM_ADMIN_CHAT_ID="$(env_get TELEGRAM_ADMIN_CHAT_ID)"
 : "${POSTGRES_USER:?POSTGRES_USER missing in .env}"
 : "${POSTGRES_DB:?POSTGRES_DB missing in .env}"
+
+# Best-effort Telegram warning. Never prints the token and never changes the exit status.
+warn_telegram() {
+  [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_ADMIN_CHAT_ID" ] || return 0
+  curl -fsS --max-time 10 -o /dev/null     "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage"     --data-urlencode "chat_id=${TELEGRAM_ADMIN_CHAT_ID}"     --data-urlencode "text=$1" >/dev/null 2>&1 || echo "backup: could not send Telegram warning" >&2
+  return 0
+}
 
 COMPOSE=(docker compose -f deploy/docker-compose.yml --env-file .env)
 BACKUP_DIR="backups"
@@ -55,20 +64,17 @@ prune "$BACKUP_DIR" 7
 prune "$BACKUP_DIR/weekly" 4
 
 # Off-site copy (only when all S3 settings are present).
-if [ -n "$BACKUP_S3_ENDPOINT" ] && [ -n "$BACKUP_S3_BUCKET" ] \
-  && [ -n "$BACKUP_S3_ACCESS_KEY" ] && [ -n "$BACKUP_S3_SECRET_KEY" ]; then
+if [ -n "$BACKUP_S3_ENDPOINT" ] && [ -n "$BACKUP_S3_BUCKET" ]   && [ -n "$BACKUP_S3_ACCESS_KEY" ] && [ -n "$BACKUP_S3_SECRET_KEY" ]; then
   export AWS_ACCESS_KEY_ID="$BACKUP_S3_ACCESS_KEY"
   export AWS_SECRET_ACCESS_KEY="$BACKUP_S3_SECRET_KEY"
-  docker run --rm \
-    -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
-    -e AWS_DEFAULT_REGION=us-east-1 \
-    -e AWS_REQUEST_CHECKSUM_CALCULATION=when_required \
-    -e AWS_RESPONSE_CHECKSUM_VALIDATION=when_required \
-    -v "$PWD/$BACKUP_DIR:/backups:ro" \
-    amazon/aws-cli s3 cp "/backups/$(basename "$FILE")" \
-    "s3://$BACKUP_S3_BUCKET/$(basename "$FILE")" \
-    --endpoint-url "$BACKUP_S3_ENDPOINT"
-  echo "backup: uploaded to S3"
+  if docker run --rm     -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY     -e AWS_DEFAULT_REGION=us-east-1     -e AWS_REQUEST_CHECKSUM_CALCULATION=when_required     -e AWS_RESPONSE_CHECKSUM_VALIDATION=when_required     -v "$PWD/$BACKUP_DIR:/backups:ro"     amazon/aws-cli s3 cp "/backups/$(basename "$FILE")"     "s3://$BACKUP_S3_BUCKET/$(basename "$FILE")"     --endpoint-url "$BACKUP_S3_ENDPOINT"; then
+    echo "backup: uploaded to S3"
+  else
+    echo "backup: S3 upload FAILED (local dump kept)" >&2
+    warn_telegram "CANH BAO Bestone: backup len S3 THAT BAI. Ban sao tren VPS van con ($(basename "$FILE")) nhung chua co ban ngoai VPS. Hay kiem tra BACKUP_S3_* trong .env."
+    exit 1
+  fi
 else
   echo "backup: BACKUP_S3_* not fully set, skipping off-site upload" >&2
+  warn_telegram "CANH BAO Bestone: chua cau hinh BACKUP_S3_* nen backup chi nam tren VPS. Mat VPS la mat du lieu. Hay dien BACKUP_S3_* trong .env."
 fi

@@ -9,22 +9,28 @@ DC="docker compose -f deploy/docker-compose.yml --env-file .env"
 
 ## 1. Xem các phiên bản có thể quay lại
 
+Mỗi dòng của `git log --oneline` là một phiên bản (mã commit ngắn + mô tả). Tag là tùy chọn, không bắt buộc phải có.
+
 ```bash
 git fetch --tags
-git tag --list --sort=-creatordate | head -20
 git log --oneline -20
 ```
 
 ## 2. Khôi phục DB từ bản backup trên VPS (làm TRƯỚC khi dựng lại bản cũ)
 
 Chỉ cần khi bản cũ có schema khác bản hiện tại. Nếu không, bỏ qua sang bước 3.
-Cảnh báo: lệnh này ghi đè dữ liệu hiện tại. Dừng app trước (db vẫn chạy).
+Cảnh báo: lệnh này XÓA toàn bộ dữ liệu hiện tại rồi nạp lại từ bản backup. Dừng app trước (db vẫn chạy).
+Nếu `pg_restore` báo lỗi (mã thoát khác 0) thì DỪNG, không bật app; hãy thử bản backup khác.
 
 ```bash
 ls -lt backups/ backups/weekly/
 $DC stop app
 set -a; . ./.env; set +a
-$DC exec -T db pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner < backups/bestone-YYYYmmdd-HHMM.dump
+$DC exec -T db dropdb -U "$POSTGRES_USER" --force "$POSTGRES_DB"
+$DC exec -T db createdb -U "$POSTGRES_USER" "$POSTGRES_DB"
+$DC exec -T db pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error < backups/bestone-YYYYmmdd-HHMM.dump
+echo "pg_restore exit status: $?"   # phai la 0
+$DC start app
 ```
 
 Nếu mất cả VPS hoặc thư mục `backups/`, tải bản dump từ S3 về trước (mục 4).

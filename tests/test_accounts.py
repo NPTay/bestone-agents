@@ -217,3 +217,11 @@ def test_change_password_kills_other_sessions(client_factory: Factory, make_user
     r = b.get("/reports", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/login"
     assert a.get("/reports").status_code == 200
+
+
+def test_malformed_uuid_renders_html_422(logged_in: LoggedIn) -> None:
+    c = logged_in(Role.giam_doc)
+    r = c.post("/dashboard/users/not-a-uuid/toggle-active", data={"csrf_token": csrf_of(c)})
+    assert r.status_code == 422
+    assert "text/html" in r.headers["content-type"]
+    assert "Dữ liệu không hợp lệ" in r.text

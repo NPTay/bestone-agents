@@ -41,14 +41,22 @@ Dev local (Windows, chạy ở thư mục gốc repo):
 Docker / VPS (chạy ở thư mục gốc repo, cần file `.env` tạo từ `.env.example`):
 - Cài VPS lần đầu: `sudo deploy/bootstrap.sh [ten_user_moi]`
 - Chạy/cập nhật: `docker compose -f deploy/docker-compose.yml --env-file .env up -d --build` (migration `alembic upgrade head` tự chạy trong entrypoint)
-- Tạo tài khoản Giám đốc lần đầu: `docker compose -f deploy/docker-compose.yml --env-file .env exec app python -m app.cli.create_admin`
+- Tạo tài khoản Giám đốc lần đầu: điền `INITIAL_ADMIN_USERNAME`/`INITIAL_ADMIN_PASSWORD` trong `.env` → `docker compose -f deploy/docker-compose.yml --env-file .env up -d app` → `docker compose -f deploy/docker-compose.yml --env-file .env exec app python -m app.cli.create_admin` → xóa hai biến đó khỏi `.env` → `up -d app` lại
+- `APP_DOMAIN` bắt buộc trong `.env` (để trống thì compose dừng với thông báo lỗi). Chạy local: `APP_DOMAIN=localhost` (Caddy dùng CA nội bộ, mở `https://localhost`)
+- Cập nhật phụ thuộc: `.venv/Scripts/python -m pip install pip-tools` rồi `.venv/Scripts/pip-compile --extra dev --output-file requirements.lock --strip-extras pyproject.toml` (Dockerfile dùng `pip install -c requirements.lock -e .`; file này là constraints nên không ép cài gói riêng Windows)
 - Đặt lại mật khẩu: `docker compose -f deploy/docker-compose.yml --env-file .env exec app python -m app.cli.reset_password --username <ten>`
 - Kiểm tra nạp knowledge: `docker compose -f deploy/docker-compose.yml --env-file .env exec app python -m app.knowledge.ingest`
 - Backup DB thủ công: `deploy/backup.sh`
 - Quay lại phiên bản cũ: xem `deploy/rollback.md`
 
+## Chạy lần đầu (checklist theo thứ tự)
+1. Điền `.env` (bootstrap tạo từ `.env.example`): `APP_DOMAIN` (bắt buộc), `BACKUP_S3_*` (bắt buộc cho backup ngoài VPS), `TELEGRAM_BOT_TOKEN` + `TELEGRAM_ADMIN_CHAT_ID` (nhận cảnh báo backup).
+2. `sudo deploy/bootstrap.sh [ten_user_moi]` (chạy lại sau khi điền `.env` nếu script dừng vì thiếu `APP_DOMAIN`).
+3. Tạo Giám đốc: điền `INITIAL_ADMIN_*` → `up -d app` → `exec app python -m app.cli.create_admin` → xóa `INITIAL_ADMIN_*` → `up -d app`.
+4. Chạy thử `deploy/backup.sh` (phải thấy "uploaded to S3") và thử khôi phục vào DB tạm theo `deploy/rollback.md` mục 5.
+
 ## Trạng thái
-- Giai đoạn 0 (khung + đăng nhập Dashboard): code xong trên nhánh `phase0-skeleton-auth`; test xanh (121 test pass, ruff và mypy sạch).
+- Giai đoạn 0 (khung + đăng nhập Dashboard): code xong trên nhánh `phase0-skeleton-auth`; test xanh (128 test pass, ruff và mypy sạch).
 - CHƯA kiểm chứng chạy thật bằng Docker (máy dev chưa có Docker).
 - Việc còn lại: chạy thử Docker theo `docs/06`, xác nhận quyền của vai trò Kế toán, sau đó sang Giai đoạn 1.
 

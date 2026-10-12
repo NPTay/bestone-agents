@@ -98,10 +98,24 @@ CRON_LINE="0 2 * * * cd $REPO && deploy/backup.sh >> backups/backup.log 2>&1"
 { crontab -l 2>/dev/null | grep -vF "deploy/backup.sh" || true; echo "$CRON_LINE"; } | crontab -
 
 DOMAIN="$(grep -E '^APP_DOMAIN=' .env | tail -n1 | cut -d= -f2- | tr -d '\r')"
+S3_MISSING=""
+for v in BACKUP_S3_ENDPOINT BACKUP_S3_BUCKET BACKUP_S3_ACCESS_KEY BACKUP_S3_SECRET_KEY; do
+  if ! grep -qE "^$v=.+" .env; then S3_MISSING="$S3_MISSING $v"; fi
+done
+if [ -n "$S3_MISSING" ]; then
+  echo
+  echo "!!! CANH BAO QUAN TRONG: backup ngoai VPS CHUA duoc cau hinh."
+  echo "!!! Con thieu trong .env:$S3_MISSING"
+  echo "!!! Neu khong co, mat VPS la mat toan bo du lieu. Phai dien truoc khi dung that (xem buoc 0b)."
+fi
+
 cat <<MSG
 
 Hoan tat. Cac buoc tiep theo (chay bang user $OWNER, KHONG dung sudo):
 0. Dang xuat roi dang nhap lai SSH mot lan de user nhan quyen nhom docker.
+0b. BAT BUOC: dien BACKUP_S3_ENDPOINT, BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY, BACKUP_S3_SECRET_KEY
+   (va TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_CHAT_ID de nhan canh bao) trong .env (nano .env),
+   roi chay thu: deploy/backup.sh  (phai bao "uploaded to S3").
 1. Dien INITIAL_ADMIN_USERNAME va INITIAL_ADMIN_PASSWORD trong .env (nano .env), roi:
    $COMPOSE up -d app
    $COMPOSE exec app python -m app.cli.create_admin

@@ -115,3 +115,41 @@ def test_backup_passes_s3_credentials_by_name_only() -> None:
     assert "-e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY" in text
     assert "AWS_REQUEST_CHECKSUM_CALCULATION=when_required" in text
     assert "AWS_RESPONSE_CHECKSUM_VALIDATION=when_required" in text
+
+
+def test_caddy_requires_domain_and_sets_security_headers() -> None:
+    env = _compose()["services"]["caddy"]["environment"]["APP_DOMAIN"]
+    assert env.startswith("${APP_DOMAIN:?")
+    caddyfile = (DEPLOY / "Caddyfile").read_text(encoding="utf-8")
+    for needle in (
+        'Strict-Transport-Security "max-age=31536000"',
+        "X-Content-Type-Options nosniff",
+        "X-Frame-Options DENY",
+        "Referrer-Policy same-origin",
+    ):
+        assert needle in caddyfile
+
+
+def test_images_are_pinned_and_app_has_healthcheck() -> None:
+    services = _compose()["services"]
+    assert re.fullmatch(r"postgres:16\.\d+", services["db"]["image"])
+    assert re.fullmatch(r"caddy:2\.\d+", services["caddy"]["image"])
+    dockerfile = (DEPLOY / "Dockerfile").read_text(encoding="utf-8")
+    assert re.search(r"^FROM python:3\.12\.\d+-slim", dockerfile, re.M)
+    assert "pip install -c requirements.lock -e ." in dockerfile
+    assert (ROOT / "requirements.lock").exists()
+    assert services["app"]["healthcheck"]["interval"] == "30s"
+    assert services["app"]["healthcheck"]["start_period"] == "30s"
+
+
+def test_backup_warns_via_telegram_and_fails_on_upload_error() -> None:
+    text = (DEPLOY / "backup.sh").read_text(encoding="utf-8")
+    assert "warn_telegram" in text and "--data-urlencode" in text
+    assert "--max-time 10" in text
+    assert "S3 upload FAILED" in text
+    assert "echo \"$TELEGRAM_BOT_TOKEN" not in text
+
+
+def test_bootstrap_warns_when_offsite_backup_unset() -> None:
+    text = (DEPLOY / "bootstrap.sh").read_text(encoding="utf-8")
+    assert "BACKUP_S3_SECRET_KEY" in text and "CANH BAO QUAN TRONG" in text
