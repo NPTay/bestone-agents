@@ -1,4 +1,5 @@
 import os
+import re
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -96,3 +97,46 @@ def frozen_now(monkeypatch: pytest.MonkeyPatch) -> FrozenNow:
     holder = FrozenNow(datetime(2026, 10, 12, 1, 0, tzinfo=UTC))
     monkeypatch.setattr(clock, "utcnow", lambda: holder.now)
     return holder
+
+
+@pytest.fixture(autouse=True)
+def _reset_login_limiter() -> None:
+    from app.auth.ratelimit import login_limiter
+
+    login_limiter.reset()
+
+
+_CSRF_INPUT = re.compile(r'(<input[^>]*name="csrf_token"[^>]*value=")[^"]*(")')
+
+
+def csrf_of(client: TestClient) -> str:
+    """Return the form CSRF token for the client's current CSRF cookie."""
+    from app.auth.csrf import CSRF_COOKIE, form_token_for
+
+    match = re.search(r'name="csrf_token" value="([^"]+)"', client.get("/login").text)
+    if match:
+        return match.group(1)
+    # Already logged in: /login redirects, so derive the token from the cookie.
+    cookie = client.cookies.get(CSRF_COOKIE)
+    assert cookie, "no CSRF cookie available"
+    return form_token_for(cookie)
+
+
+def strip_csrf(html: str) -> str:
+    """Blank the CSRF hidden-input value so two renders can be compared."""
+    return _CSRF_INPUT.sub(r"\1\2", html)
+
+
+@pytest.fixture
+def proxied_client(db: orm.Session) -> Callable[[str], TestClient]:
+    """Factory: client whose requests carry X-Forwarded-For, via a trusted proxy."""
+    from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+    def _make(xff: str) -> TestClient:
+        get_settings.cache_clear()
+        app = create_app()
+        app.dependency_overrides[get_db] = lambda: db
+        wrapped = ProxyHeadersMiddleware(app, trusted_hosts=["testclient"])
+        return TestClient(wrapped, base_url="https://testserver", headers={"X-Forwarded-For": xff})
+
+    return _make

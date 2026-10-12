@@ -18,6 +18,7 @@ dependencies = [
     "python-multipart",
     "argon2-cffi",
     "httpx",
+    "tzdata",
 ]
 
 [project.optional-dependencies]

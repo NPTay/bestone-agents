@@ -16,19 +16,35 @@ def _form_token(cookie_value: str) -> str:
     return hmac.new(key, cookie_value.encode(), hashlib.sha256).hexdigest()
 
 
+def form_token_for(cookie_value: str) -> str:
+    """Public accessor: the form token that matches a given CSRF cookie value."""
+    return _form_token(cookie_value)
+
+
+def _set_csrf_cookie(response: Response, value: str) -> None:
+    response.set_cookie(
+        CSRF_COOKIE,
+        value,
+        httponly=True,
+        secure=cookie_secure(),
+        samesite="lax",
+        path="/",
+    )
+
+
+def rotate_csrf_cookie(response: Response) -> str:
+    """Issue a fresh CSRF cookie (login/logout, anti cookie-tossing); return its form token."""
+    value = secrets.token_urlsafe(32)
+    _set_csrf_cookie(response, value)
+    return _form_token(value)
+
+
 def ensure_csrf_cookie(request: Request, response: Response) -> str:
     """Set the CSRF cookie if absent; return the form token derived from it."""
     value = request.cookies.get(CSRF_COOKIE)
     if not value:
         value = secrets.token_urlsafe(32)
-        response.set_cookie(
-            CSRF_COOKIE,
-            value,
-            httponly=True,
-            secure=cookie_secure(),
-            samesite="lax",
-            path="/",
-        )
+        _set_csrf_cookie(response, value)
     return _form_token(value)
 
 

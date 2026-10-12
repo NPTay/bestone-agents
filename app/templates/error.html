@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Lỗi — Bestone Console{% endblock %}
+{% block body %}
+<main class="flex min-h-screen items-center justify-center px-4">
+  <div class="w-full max-w-md rounded-lg bg-white p-8 text-center shadow">
+    <p class="text-lg font-semibold">{{ message }}</p>
+    <a href="/login" class="mt-4 inline-block text-sm text-blue-700 underline">Về trang đăng nhập</a>
+  </div>
+</main>
+{% endblock %}
