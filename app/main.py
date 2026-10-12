@@ -4,7 +4,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.auth.dependencies import LoginRequired
 from app.config import Settings, get_settings
-from app.routers import auth, health
+from app.routers import admin_api, auth, dashboard, health, reports
 from app.templates import templates
 
 
@@ -14,6 +14,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(dashboard.router)
+    app.include_router(reports.router)
+    app.include_router(admin_api.router)
 
     @app.exception_handler(LoginRequired)
     async def _login_required(request: Request, exc: LoginRequired) -> RedirectResponse:

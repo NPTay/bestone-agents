@@ -140,3 +140,35 @@ def proxied_client(db: orm.Session) -> Callable[[str], TestClient]:
         return TestClient(wrapped, base_url="https://testserver", headers={"X-Forwarded-For": xff})
 
     return _make
+
+
+@pytest.fixture
+def client_factory(client: TestClient) -> Callable[[], TestClient]:
+    """Factory: a fresh, cookie-isolated TestClient on the same app (and DB session)."""
+
+    def _make() -> TestClient:
+        return TestClient(client.app, base_url="https://testserver")
+
+    return _make
+
+
+@pytest.fixture
+def logged_in(
+    client_factory: Callable[[], TestClient], make_user: Callable[..., User]
+) -> Callable[[Role], TestClient]:
+    """Factory: new TestClient logged in (via POST /login) as a fresh user of the given role."""
+    counter = iter(range(1_000_000))
+
+    def _login(role: Role) -> TestClient:
+        username = f"{role.value}_{next(counter)}"
+        make_user(username=username, password="Matkhau#2026", role=role)
+        c = client_factory()
+        r = c.post(
+            "/login",
+            data={"username": username, "password": "Matkhau#2026", "csrf_token": csrf_of(c)},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        return c
+
+    return _login

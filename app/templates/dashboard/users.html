@@ -1,0 +1,67 @@
+{% extends "app_base.html" %}
+{% block title %}Tài khoản — Bestone Console{% endblock %}
+{% block content %}
+<h1 class="mb-4 text-xl font-bold">Quản lý tài khoản</h1>
+{% if error %}
+<p class="mb-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
+{% endif %}
+<section class="mb-6 rounded-lg bg-white p-4 shadow">
+  <h2 class="mb-3 font-semibold">Tạo tài khoản mới</h2>
+  <form method="post" action="/dashboard/users" class="grid gap-3 sm:grid-cols-2">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div>
+      <label for="username" class="mb-1 block text-sm font-medium">Tên đăng nhập</label>
+      <input id="username" name="username" type="text" required maxlength="100" autocomplete="off"
+             value="{{ form_username or '' }}" class="w-full rounded border border-gray-300 px-3 py-2">
+    </div>
+    <div>
+      <label for="full_name" class="mb-1 block text-sm font-medium">Họ tên</label>
+      <input id="full_name" name="full_name" type="text" maxlength="200"
+             value="{{ form_full_name or '' }}" class="w-full rounded border border-gray-300 px-3 py-2">
+    </div>
+    <div>
+      <label for="password" class="mb-1 block text-sm font-medium">Mật khẩu</label>
+      <input id="password" name="password" type="password" required autocomplete="new-password"
+             class="w-full rounded border border-gray-300 px-3 py-2">
+    </div>
+    <div>
+      <label for="role" class="mb-1 block text-sm font-medium">Vai trò</label>
+      <select id="role" name="role" class="w-full rounded border border-gray-300 px-3 py-2">
+        <option value="ke_toan">Kế toán</option>
+        <option value="giam_doc">Giám đốc</option>
+      </select>
+    </div>
+    <div class="sm:col-span-2">
+      <button type="submit" class="rounded bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800">Tạo tài khoản</button>
+    </div>
+  </form>
+</section>
+<section class="space-y-3">
+  {% for u in users %}
+  <div class="rounded-lg bg-white p-4 shadow">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <span class="font-semibold">{{ u.username }}</span>
+        {% if u.full_name %}<span class="text-sm text-gray-600"> — {{ u.full_name }}</span>{% endif %}
+        <span class="ml-2 rounded bg-gray-100 px-2 py-0.5 text-xs">{{ "Giám đốc" if u.role.value == "giam_doc" else "Kế toán" }}</span>
+        <span class="ml-1 text-xs {{ 'text-green-700' if u.is_active else 'text-red-700' }}">{{ "Đang hoạt động" if u.is_active else "Đã khóa" }}</span>
+      </div>
+      {% if u.id != user.id %}
+      <form method="post" action="/dashboard/users/{{ u.id }}/toggle-active">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="text-sm text-blue-700 hover:underline">{{ "Vô hiệu hóa" if u.is_active else "Kích hoạt lại" }}</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if u.id != user.id %}
+    <form method="post" action="/dashboard/users/{{ u.id }}/reset-password" class="mt-3 flex flex-wrap gap-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input name="new_password" type="password" required autocomplete="new-password" placeholder="Mật khẩu mới"
+             aria-label="Mật khẩu mới cho {{ u.username }}" class="min-w-0 flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm">
+      <button type="submit" class="rounded border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">Đặt lại mật khẩu</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% endblock %}

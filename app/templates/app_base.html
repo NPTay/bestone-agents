@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block body %}
+<header class="bg-white shadow">
+  <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+    <span class="font-bold">Bestone Console</span>
+    <nav class="flex flex-1 flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+      {% if user.role.value == "giam_doc" %}
+      <a href="/dashboard" class="text-blue-700 hover:underline">Bảng điều khiển</a>
+      <a href="/dashboard/users" class="text-blue-700 hover:underline">Tài khoản</a>
+      {% endif %}
+      <a href="/reports" class="text-blue-700 hover:underline">Báo cáo</a>
+      <a href="/account/change-password" class="text-blue-700 hover:underline">Đổi mật khẩu</a>
+    </nav>
+    <form method="post" action="/logout">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="text-sm text-gray-700 hover:underline">Đăng xuất</button>
+    </form>
+  </div>
+</header>
+<main class="mx-auto max-w-5xl px-4 py-6">
+  {% block content %}{% endblock %}
+</main>
+{% endblock %}

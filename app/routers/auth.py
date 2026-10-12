@@ -7,12 +7,14 @@ from sqlalchemy import orm
 from app.audit import write_audit
 from app.auth.csrf import ensure_csrf_cookie, rotate_csrf_cookie, verify_csrf
 from app.auth.dependencies import require_login
+from app.auth.passwords import hash_password, validate_new_password, verify_password
 from app.auth.ratelimit import login_limiter
 from app.auth.service import authenticate, format_local_time
 from app.auth.session import (
     clear_session_cookie,
     create_session,
     destroy_session,
+    destroy_user_sessions,
     resolve_session,
     set_session_cookie,
 )
@@ -20,6 +22,7 @@ from app.config import get_settings
 from app.db.models import Role, User
 from app.db.session import get_db
 from app.templates import templates
+from app.web import render_page
 
 router = APIRouter()
 
@@ -104,3 +107,41 @@ def logout(
     clear_session_cookie(response)
     rotate_csrf_cookie(response)
     return response
+
+
+@router.get("/account/change-password")
+def change_password_page(
+    request: Request,
+    user: User = Depends(require_login),  # noqa: B008
+) -> Response:
+    return render_page(request, "change_password.html", user)
+
+
+@router.post("/account/change-password", dependencies=[Depends(verify_csrf)])
+def change_password_submit(
+    request: Request,
+    current_password: str = Form(""),
+    new_password: str = Form(""),
+    confirm_password: str = Form(""),
+    user: User = Depends(require_login),  # noqa: B008
+    db: orm.Session = Depends(get_db),  # noqa: B008
+) -> Response:
+    error: str | None = None
+    if not verify_password(user.password_hash, current_password):
+        error = "Mật khẩu hiện tại không đúng"
+    elif new_password != confirm_password:
+        error = "Mật khẩu mới và phần nhập lại không khớp"
+    else:
+        error = validate_new_password(new_password)
+    if error is not None:
+        return render_page(request, "change_password.html", user, status_code=400, error=error)
+    user.password_hash = hash_password(new_password)
+    user.failed_attempts = 0
+    user.last_failed_at = None
+    user.locked_until = None
+    write_audit(db, user.id, "password_changed", "user", str(user.id), {})
+    db.commit()
+    destroy_user_sessions(
+        db, user.id, except_token=request.cookies.get(get_settings().SESSION_COOKIE_NAME)
+    )
+    return render_page(request, "change_password.html", user, success="Đã đổi mật khẩu")
