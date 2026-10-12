@@ -23,15 +23,24 @@ from app.main import create_app  # noqa: E402
 
 @pytest.fixture
 def engine() -> Iterator[Engine]:
-    eng = make_engine("sqlite://")
+    """In-memory SQLite by default; real Postgres when TEST_DATABASE_URL is set."""
+    test_url = os.environ.get("TEST_DATABASE_URL")
+    eng = make_engine(test_url or "sqlite://")
+    if test_url:
+        Base.metadata.drop_all(eng)  # clean slate in case a previous run crashed
     Base.metadata.create_all(eng)
     yield eng
+    if test_url:
+        Base.metadata.drop_all(eng)
     eng.dispose()
 
 
 @pytest.fixture
 def db_url_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Engine]:
-    """Point DATABASE_URL at a temp-file SQLite DB so CLIs open their own session."""
+    """Point DATABASE_URL at a temp-file SQLite DB so CLIs open their own session.
+
+    Always SQLite, even when TEST_DATABASE_URL is set (CLI/migration tests are SQLite-only).
+    """
     eng = make_engine(f"sqlite:///{tmp_path / 'cli.db'}")
     Base.metadata.create_all(eng)
     monkeypatch.setenv("DATABASE_URL", str(eng.url))

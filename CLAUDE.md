@@ -35,7 +35,8 @@ Dev local (Windows, chạy ở thư mục gốc repo):
 - Tạo môi trường: `py -3.12 -m venv .venv` rồi `.venv/Scripts/python -m pip install -e ".[dev]"`
 - Test: `.venv/Scripts/python -m pytest -q`
 - Lint: `.venv/Scripts/ruff check .`; kiểm tra kiểu: `.venv/Scripts/mypy app`
-- Test cần Postgres thật: bật `db` bằng `deploy/docker-compose.test.yml` (xem file), đặt `TEST_DATABASE_URL`
+- (PowerShell: dùng dấu `\` thay `/`, ví dụ `.venv\Scripts\python -m pytest -q`; Git Bash dùng `/`)
+- Test mặc định chạy trên SQLite trong bộ nhớ. Để chạy trên Postgres thật: bật DB test `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.test.yml --env-file .env up -d db`, rồi đặt `TEST_DATABASE_URL=postgresql+psycopg://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:5432/<POSTGRES_DB>` (lấy giá trị trong `.env`; PowerShell: `$env:TEST_DATABASE_URL="..."`) và chạy pytest. Mỗi test tự tạo/xóa bảng nên dùng DB riêng, không dùng DB production. Test CLI/migration luôn dùng SQLite.
 
 Docker / VPS (chạy ở thư mục gốc repo, cần file `.env` tạo từ `.env.example`):
 - Cài VPS lần đầu: `sudo deploy/bootstrap.sh [ten_user_moi]`
