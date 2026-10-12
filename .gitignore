@@ -1,0 +1,11 @@
+.venv/
+.env
+__pycache__/
+*.db
+backups/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.superpowers/
+Picture/
+Tai Lieu/
