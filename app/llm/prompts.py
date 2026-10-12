@@ -11,6 +11,7 @@ AGENT_FILES: dict[str, str] = {
     "content": "a2_content.md",
     "publisher": "a3_publisher.md",
     "care": "a4_customer_care.md",
+    "guardrail_judge": "guardrail_judge.md",
 }
 
 _PROMPT_BLOCK = re.compile(r"^```prompt[ \t]*\r?\n(.*?)^```[ \t]*$", re.DOTALL | re.MULTILINE)
