@@ -11,15 +11,15 @@ from app.auth.csrf import verify_csrf
 from app.auth.dependencies import require_role
 from app.auth.passwords import hash_password, validate_new_password
 from app.auth.session import destroy_user_sessions
-from app.db.models import Role, Setting, User
+from app.db.models import Role, User
 from app.db.session import get_db
+from app.settings_store import get_autonomy
 from app.web import render_page
 
 router = APIRouter(prefix="/dashboard")
 
 USERS_URL = "/dashboard/users"
 ALLOWED_ROLES = {Role.giam_doc.value, Role.ke_toan.value}
-DEFAULT_AUTONOMY = "draft_only"
 DUPLICATE_USERNAME = "Tên đăng nhập đã tồn tại"
 
 CurrentGiamDoc = Depends(require_role(Role.giam_doc))
@@ -38,10 +38,7 @@ def index(
     user: User = CurrentGiamDoc,
     db: orm.Session = Depends(get_db),  # noqa: B008
 ) -> Response:
-    level = db.scalar(select(Setting.value).where(Setting.key == "AUTONOMY_LEVEL"))
-    return render_page(
-        request, "dashboard/index.html", user, autonomy_level=level or DEFAULT_AUTONOMY
-    )
+    return render_page(request, "dashboard/index.html", user, autonomy_level=get_autonomy(db))
 
 
 @router.get("/users")
