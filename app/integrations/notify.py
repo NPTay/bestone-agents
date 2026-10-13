@@ -11,9 +11,6 @@ from app.telegram.bot import TelegramBot, TelegramError
 
 logger = logging.getLogger(__name__)
 
-# httpx logs full request URLs at INFO, and the Telegram URL embeds the bot token.
-logging.getLogger("httpx").setLevel(logging.WARNING)
-
 AlertLevel = Literal["info", "warn", "urgent"]
 
 

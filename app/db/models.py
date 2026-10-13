@@ -108,6 +108,8 @@ class Post(TimestampMixin, Base):
     fb_post_id: Mapped[str | None] = mapped_column(String(100))
     comment_id: Mapped[str | None] = mapped_column(String(100))
     error: Mapped[str | None] = mapped_column(Text)
+    # Morning article text, kept so revisions can be fact-checked (ruling R7).
+    source_text: Mapped[str | None] = mapped_column(Text)
 
 
 class ResearchItem(TimestampMixin, Base):

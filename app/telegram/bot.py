@@ -1,4 +1,5 @@
 import json
+import logging
 from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
@@ -7,6 +8,9 @@ import httpx
 
 MAX_PHOTOS = 10
 ALLOWED_UPDATES = ["message", "callback_query"]
+
+# httpx logs full request URLs at INFO, and the Telegram URL embeds the bot token.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 class TelegramError(Exception):
