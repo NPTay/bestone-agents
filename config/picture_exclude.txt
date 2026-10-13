@@ -1,0 +1,4 @@
+# Danh sách ảnh/thư mục KHÔNG được dùng để đăng bài.
+# Mỗi dòng một thư mục hoặc một đường dẫn tệp, tính từ thư mục Picture.
+# Ví dụ: MAU SAN PHAM BESTONE
+# Dòng bắt đầu bằng # là ghi chú.

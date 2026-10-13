@@ -95,3 +95,50 @@ Công trình cấp-thoát nước/tài nguyên nước, bể chứa ngầm, kế
 - So sánh xấu với đối thủ cụ thể; chê sản phẩm khác.
 - Khả năng xử lý vết nứt lớn hơn 0,4 mm, vết nứt đang hoạt động mạnh, rò rỉ áp lực cao: chuyển kỹ sư/GĐ.
 - Thiết kế cấp phối cho dự án cụ thể (cần trộn thử theo mục 8).
+
+
+## 13. Công trình trong thư viện ảnh
+
+Mỗi thư mục trong `Picture/` chỉ được nêu tên trong bài khi mục con tương ứng bên dưới đã điền đủ (không còn `[GĐ BỔ SUNG]`).
+
+### Thư mục: Tòa nhà Kyobo
+- Tên hiển thị: [GĐ BỔ SUNG]
+- Quốc gia / địa điểm: [GĐ BỔ SUNG]
+- Hạng mục dùng Bestone: [GĐ BỔ SUNG]
+- Năm: [GĐ BỔ SUNG]
+- Ghi chú được phép nêu: [GĐ BỔ SUNG]
+
+### Thư mục: 교보 INSURANCE COMPANY (B1-B4)
+- Tên hiển thị: [GĐ BỔ SUNG]
+- Quốc gia / địa điểm: [GĐ BỔ SUNG]
+- Hạng mục dùng Bestone: [GĐ BỔ SUNG]
+- Năm: [GĐ BỔ SUNG]
+- Ghi chú được phép nêu: [GĐ BỔ SUNG]
+
+### Thư mục: 경주 CONVENTION CENTER
+- Tên hiển thị: [GĐ BỔ SUNG]
+- Quốc gia / địa điểm: [GĐ BỔ SUNG]
+- Hạng mục dùng Bestone: [GĐ BỔ SUNG]
+- Năm: [GĐ BỔ SUNG]
+- Ghi chú được phép nêu: [GĐ BỔ SUNG]
+
+### Thư mục: KOREA RESEARCH INSTITUTE OF DECOMMISSIONING
+- Tên hiển thị: [GĐ BỔ SUNG]
+- Quốc gia / địa điểm: [GĐ BỔ SUNG]
+- Hạng mục dùng Bestone: [GĐ BỔ SUNG]
+- Năm: [GĐ BỔ SUNG]
+- Ghi chú được phép nêu: [GĐ BỔ SUNG]
+
+### Thư mục: Warehouse - 80m of basement
+- Tên hiển thị: [GĐ BỔ SUNG]
+- Quốc gia / địa điểm: [GĐ BỔ SUNG]
+- Hạng mục dùng Bestone: [GĐ BỔ SUNG]
+- Năm: [GĐ BỔ SUNG]
+- Ghi chú được phép nêu: [GĐ BỔ SUNG]
+
+### Thư mục: Hoi Thao Saca 9-3
+- Tên hiển thị: [GĐ BỔ SUNG]
+- Quốc gia / địa điểm: [GĐ BỔ SUNG]
+- Hạng mục dùng Bestone: [GĐ BỔ SUNG]
+- Năm: [GĐ BỔ SUNG]
+- Ghi chú được phép nêu: [GĐ BỔ SUNG]
