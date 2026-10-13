@@ -187,3 +187,52 @@ def test_check_passes_when_required_items_ok(
     assert check(settings, anthropic_client=FakeAnthropic()) == 0
     assert json.loads(send.calls[0].request.content)["text"] == "Kiểm tra kết nối OK"
     assert "✅ Telegram" in capsys.readouterr().out
+
+
+def _fake_genai(monkeypatch: pytest.MonkeyPatch, exc: Exception | None) -> list[dict[str, object]]:
+    """Fake genai.Client whose http client 'closes' when the Client object is dropped."""
+    from google import genai
+
+    calls: list[dict[str, object]] = []
+
+    class FakeModels:
+        def __init__(self, owner: "FakeClient") -> None:
+            self.owner = owner
+
+        def generate_content(self, **kw: object) -> object:
+            calls.append(kw)
+            if exc:
+                raise exc
+            return object()
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.models = FakeModels(self)
+
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    return calls
+
+
+class _Quota(Exception):
+    code = 429
+
+
+def test_check_gemini_explains_quota_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.cli import setup_tools
+
+    _fake_genai(monkeypatch, _Quota("429 RESOURCE_EXHAUSTED"))
+    with pytest.raises(setup_tools.SetupError) as err:
+        setup_tools._check_gemini(_settings(GEMINI_API_KEY="g"))
+    msg = str(err.value)
+    assert "429" in msg and "Billing" in msg
+
+
+def test_check_gemini_ok_makes_one_tiny_image_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.cli import setup_tools
+
+    calls = _fake_genai(monkeypatch, None)
+    out = setup_tools._check_gemini(
+        _settings(GEMINI_API_KEY="g", GEMINI_IMAGE_MODEL="gemini-x-image")
+    )
+    assert "gemini-x-image" in out
+    assert len(calls) == 1 and calls[0]["model"] == "gemini-x-image"

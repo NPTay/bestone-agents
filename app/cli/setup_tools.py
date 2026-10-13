@@ -236,17 +236,31 @@ def _check_unsplash(s: Settings) -> str:
 
 
 def _check_gemini(s: Settings) -> str:
+    """Generate one tiny image: the only way to see a billing/quota problem (429)."""
     if not s.GEMINI_API_KEY:
         raise SetupError("chưa có GEMINI_API_KEY (không bắt buộc)")
     try:
         from google import genai
+        from google.genai import types
 
-        genai.Client(api_key=s.GEMINI_API_KEY).models.get(model=s.GEMINI_IMAGE_MODEL)
-    except Exception as exc:  # noqa: BLE001 - SDK errors vary; report the type only
+        # Keep a reference: a dropped Client closes its HTTP client before the call.
+        client = genai.Client(api_key=s.GEMINI_API_KEY)
+        client.models.generate_content(
+            model=s.GEMINI_IMAGE_MODEL,
+            contents="A small plain grey square, no text",
+            config=types.GenerateContentConfig(response_modalities=["IMAGE"]),
+        )
+    except Exception as exc:  # noqa: BLE001 - SDK errors vary; never print the message
+        if getattr(exc, "code", None) == 429:
+            raise SetupError(
+                f"{s.GEMINI_IMAGE_MODEL}: hết hạn mức tạo ảnh (429). Gói miễn phí không tạo "
+                "được ảnh — bật Billing tại https://aistudio.google.com rồi chạy lại. "
+                "Trong lúc chờ, bài sáng dùng ảnh Unsplash."
+            ) from None
         raise SetupError(
             f"không dùng được mô hình {s.GEMINI_IMAGE_MODEL} ({type(exc).__name__})"
         ) from None
-    return f"có mô hình {s.GEMINI_IMAGE_MODEL}"
+    return f"tạo ảnh thử thành công với {s.GEMINI_IMAGE_MODEL}"
 
 
 def _count_files(folder: Path, suffixes: set[str] | None) -> int:

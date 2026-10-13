@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
@@ -10,7 +11,9 @@ from uuid import uuid4
 import httpx
 from pydantic import BaseModel
 
+from app import clock
 from app.config import Settings
+from app.schedule_times import local_now
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +22,15 @@ NO_IMAGE_NOTE = (
     "⚠️ Không lấy được ảnh (kho ảnh và AI đều lỗi). "
     "Anh/chị có thể bấm Đăng để đăng không ảnh, hoặc góp ý."
 )
+
+
+# Local date on which Gemini answered 429 (quota exhausted). Gemini is skipped for the
+# rest of that day so every draft doesn't burn a call on a known failure.
+_gemini_paused_on: date | None = None
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    return getattr(exc, "code", None) == 429
 
 
 class ImagePlan(BaseModel):
@@ -91,7 +103,11 @@ def _track_download(client: httpx.Client, photo: dict[str, Any], auth: dict[str,
 
 
 def generate_ai(prompt: str, dest_dir: Path, settings: Settings) -> ImageResult | None:
+    global _gemini_paused_on
     if not settings.GEMINI_API_KEY:
+        return None
+    today = local_now(clock.utcnow()).date()
+    if _gemini_paused_on == today:
         return None
     try:
         from google import genai
@@ -116,7 +132,11 @@ def generate_ai(prompt: str, dest_dir: Path, settings: Settings) -> ImageResult 
         log.warning("gemini returned no image")
         return None
     except Exception as exc:  # noqa: BLE001
-        _log_failure("gemini", exc)
+        if _is_quota_error(exc):
+            _gemini_paused_on = today
+            log.warning("gemini quota exhausted (429); skipping Gemini until tomorrow")
+        else:
+            _log_failure("gemini", exc)
         return None
 
 

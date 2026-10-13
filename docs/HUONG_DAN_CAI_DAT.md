@@ -82,7 +82,7 @@ Bạn cần là **quản trị viên** của Fanpage.
 ```powershell
 .venv\Scripts\python -m app.cli.setup_tools check
 ```
-Mỗi dòng bắt đầu bằng ✅ (ổn) hoặc ❌ (lỗi, kèm lý do). Anthropic và Telegram phải ✅ (Telegram sẽ nhận một tin "Kiểm tra kết nối OK"). Unsplash, Gemini, hai thư mục ảnh/tài liệu là tùy chọn. Facebook chỉ bắt buộc khi `DRY_RUN=false`.
+Mỗi dòng bắt đầu bằng ✅ (ổn) hoặc ❌ (lỗi, kèm lý do). Anthropic và Telegram phải ✅ (Telegram sẽ nhận một tin "Kiểm tra kết nối OK"). Unsplash, Gemini, hai thư mục ảnh/tài liệu là tùy chọn. Facebook chỉ bắt buộc khi `DRY_RUN=false`. Dòng Gemini tạo thử một ảnh rất nhỏ để biết có bị giới hạn không (tốn một khoản rất nhỏ khi đã bật Billing). Nếu báo "hết hạn mức tạo ảnh (429)": bật Billing như mục 6; khi gặp lỗi này trong lúc chạy, chương trình tự bỏ qua Gemini đến hết ngày và dùng ảnh Unsplash.
 
 ## 9. Khởi động chương trình và chạy thử vài ngày với DRY_RUN=true
 Trước hết chắc rằng trong `.env` có `DRY_RUN=true` (mặc định). Chế độ này nghĩa là chương trình soạn bài, gửi Telegram, bạn duyệt, nhưng **không đăng thật lên Facebook**; chỉ ghi nhận "đã đăng" để bạn xem luồng chạy.

@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import httpx
 import pytest
@@ -188,3 +189,37 @@ def test_first_attempt_exception_still_tries_second(
     monkeypatch.setattr(images, "fetch_stock", raises)
     monkeypatch.setattr(images, "generate_ai", lambda *a, **k: ai)
     assert images.get_morning_image(PLAN, tmp_path, _settings()) is ai
+
+
+class _QuotaError(Exception):
+    code = 429
+
+
+def test_gemini_quota_error_pauses_gemini_until_next_local_day(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, frozen_clock: Any
+) -> None:
+    from datetime import UTC, datetime
+
+    monkeypatch.setattr(images, "_gemini_paused_on", None)
+    models = _FakeModels(exc=_QuotaError("429 RESOURCE_EXHAUSTED"))
+    built = _install_fake_client(monkeypatch, models)
+    s = _settings(GEMINI_API_KEY="g")
+    frozen_clock(datetime(2026, 10, 13, 1, 0, tzinfo=UTC))  # 08:00 local
+    assert images.generate_ai("p", tmp_path, s) is None
+    assert images.generate_ai("p", tmp_path, s) is None
+    assert len(built) == 1  # second call skipped: quota exhausted today
+    frozen_clock(datetime(2026, 10, 14, 1, 0, tzinfo=UTC))  # next local day
+    assert images.generate_ai("p", tmp_path, s) is None
+    assert len(built) == 2
+
+
+def test_gemini_other_errors_do_not_pause(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(images, "_gemini_paused_on", None)
+    models = _FakeModels(exc=RuntimeError("boom"))
+    built = _install_fake_client(monkeypatch, models)
+    s = _settings(GEMINI_API_KEY="g")
+    images.generate_ai("p", tmp_path, s)
+    images.generate_ai("p", tmp_path, s)
+    assert len(built) == 2
