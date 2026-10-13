@@ -26,7 +26,20 @@ def load_agent_prompt(agent: str, root: Path = PROJECT_ROOT) -> str:
     return match.group(1).strip()
 
 
+# Explicit allowlist: review files such as catalogue_proposals.md must never reach a prompt.
+RUNTIME_KNOWLEDGE_FILES = (
+    "bestone_knowledge_base.md",
+    "brand_voice.md",
+    "content_pillars.md",
+    "guardrails_compliance.md",
+)
+
+
 def load_knowledge(root: Path = PROJECT_ROOT) -> dict[str, str]:
-    """Return filename -> content for every knowledge/*.md file."""
-    files = sorted((root / "knowledge").glob("*.md"))
-    return {p.name: p.read_text(encoding="utf-8") for p in files}
+    """Return filename -> content for the runtime knowledge files (allowlist only)."""
+    base = root / "knowledge"
+    return {
+        name: (base / name).read_text(encoding="utf-8")
+        for name in RUNTIME_KNOWLEDGE_FILES
+        if (base / name).is_file()
+    }
