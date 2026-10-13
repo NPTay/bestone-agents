@@ -274,3 +274,11 @@ def test_check_project_names_korean_token_and_case() -> None:
     assert len(check_project_names("WAREHOUSE - 80M OF BASEMENT", unverified)) == 1
     assert check_project_names("Kho hàng tầng hầm sâu.", unverified) == []
     assert check_project_names("Kyobo", []) == []
+
+
+def test_news_url_numeric_id_not_a_fact() -> None:
+    url = "https://baoxaydung.vn/ham-chui-bi-tham-nuoc-192241013.htm"
+    assert "facts" not in _checks(body=SAMPLE["body"] + f" Theo Báo Xây Dựng ({url}).")
+    f = check_rules(**{**SAMPLE, "body": SAMPLE["body"] + f" {url} Giảm 95% rò rỉ."})
+    facts = [x for x in f if x.check == "facts"]
+    assert len(facts) == 1 and "95" in facts[0].message

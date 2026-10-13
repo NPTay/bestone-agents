@@ -76,7 +76,11 @@ def kb_number_set(kb_text: str) -> set[str]:
     return extract_numbers("\n".join(lines))
 
 
+_URL_RE = re.compile(r"https?://\S+")
+
+
 def _check_facts(texts: str, kb_text: str, source_texts: list[str]) -> list[RuleFinding]:
+    texts = _URL_RE.sub(" ", texts)  # numeric IDs in news URLs are not claims
     allowed = kb_number_set(kb_text)
     for source in source_texts:
         allowed |= extract_numbers(source)

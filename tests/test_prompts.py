@@ -55,3 +55,11 @@ def test_knowledge_loaded() -> None:
     }
     assert expected <= kb.keys()
 
+
+
+def test_content_prompt_keeps_cta_and_link_out_of_body() -> None:
+    prompt = load_agent_prompt("content")
+    assert "KHÔNG đặt lời kêu gọi trong body" in prompt
+    assert "KHÔNG đặt link trong body" in prompt
+    assert "Cuối body có lời kêu gọi" not in prompt
+    assert "tên báo + link" not in prompt

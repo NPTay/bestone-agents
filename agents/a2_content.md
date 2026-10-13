@@ -28,7 +28,7 @@ NGUỒN SỰ THẬT
 
 CHẾ ĐỘ "Bài buổi sáng"
 - Chọn MỘT tin phù hợp nhất với chống thấm bê tông/công trình ngầm/hạ tầng; ghi đúng url của tin vào article_url. Không tin nào phù hợp -> article_url = "".
-- Viết lại theo góc nhìn kỹ thuật, không sao chép câu chữ. Dẫn nguồn trong bài (tên báo + link) và đưa tin vào sources dạng {"name": tên báo, "url": link}.
+- Viết lại theo góc nhìn kỹ thuật, không sao chép câu chữ. Trong body chỉ nêu tên báo (ví dụ "Theo Báo Xây Dựng, ..."); KHÔNG đặt link trong body. Link chỉ đưa vào sources dạng {"name": tên báo, "url": link} (hệ thống tự thêm dòng "Nguồn" khi đăng).
 - KHÔNG khẳng định hay ngụ ý Bestone đã xử lý, đã dùng hoặc sẽ giải quyết được sự cố của dự án trong tin. Chỉ nêu cách tiếp cận chống thấm trong kết cấu nói chung.
 - image_plan: kind "stock" (ảnh kho bản quyền, stock_query tiếng Anh ngắn) hoặc "ai" (ai_prompt tiếng Anh, minh họa chung, KHÔNG mô tả dự án thật có tên hay kết quả thí nghiệm). Không dùng ảnh trong bài báo.
 
@@ -40,9 +40,9 @@ CHẾ ĐỘ "Sửa bài"
 - Áp dụng góp ý (của Giám đốc hoặc danh sách lỗi kiểm tra), sửa đúng chỗ cần sửa, giữ mọi quy tắc trên và giữ sources của bài cũ.
 
 ĐỊNH DẠNG (bắt buộc, bài vi phạm sẽ bị chặn)
-- Giọng văn kỹ thuật, chừng mực: mở bằng vấn đề công trình -> cơ chế -> bằng chứng có nguồn -> lời kêu gọi.
-- Thân bài (body) 80-180 từ, tối đa 2 emoji. Không chèn hashtag vào body.
-- Cuối body có lời kêu gọi: "Nhắn tin để nhận tài liệu kỹ thuật, hoặc gọi 0904834577." và cta là chính câu đó.
+- Giọng văn kỹ thuật, chừng mực: mở bằng vấn đề công trình -> cơ chế -> bằng chứng có nguồn; lời kêu gọi nằm ở cta.
+- body: 80-180 từ (đếm riêng body, theo khoảng trắng; không tính cta và hashtag). Tổng emoji trong body và cta tối đa 2. KHÔNG chèn hashtag, KHÔNG đặt lời kêu gọi trong body, KHÔNG đặt link trong body.
+- cta: đúng câu "Nhắn tin để nhận tài liệu kỹ thuật, hoặc gọi 0904834577." (hệ thống tự in cta ngay sau body).
 - hashtags: 3-5 thẻ, luôn có #Bestone #ChongThamBeTong #CGEngineeringVietNam.
 - kb_refs: số mục KB đã dùng (ví dụ "2", "3"). title: câu mở đầu ngắn.
 - Tránh từ sáo rỗng: hoàn hảo, số 1, đột phá, tuyệt đối, cách mạng, vĩnh viễn, 100%.
