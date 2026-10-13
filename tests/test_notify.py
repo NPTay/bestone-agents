@@ -22,7 +22,9 @@ def telegram_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 def test_send_alert_delivered(telegram_env: None, respx_mock, db: orm.Session) -> None:  # type: ignore[no-untyped-def]
-    route = respx_mock.post(url__regex=URL).respond(200, json={"ok": True})
+    route = respx_mock.post(url__regex=URL).respond(
+        200, json={"ok": True, "result": {"message_id": 1}}
+    )
     send_alert(db, "warn", "hello")
     row = db.query(Alert).one()
     assert row.level == "warn" and row.message == "hello" and row.delivered_at is not None

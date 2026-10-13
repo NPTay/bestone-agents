@@ -7,6 +7,7 @@ from sqlalchemy import orm
 from app import clock
 from app.config import get_settings
 from app.db.models import Alert
+from app.telegram.bot import TelegramBot, TelegramError
 
 logger = logging.getLogger(__name__)
 
@@ -28,13 +29,9 @@ def send_alert(db: orm.Session, level: AlertLevel, message: str) -> None:
     if not use_telegram:
         return
     try:
-        resp = httpx.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": message},
-            timeout=10,
-        )
-        resp.raise_for_status()
-    except Exception as exc:
+        with httpx.Client(timeout=10) as client:
+            TelegramBot(token, chat_id, client=client).send_message(message)
+    except (TelegramError, httpx.HTTPError) as exc:
         # Log only the exception type: httpx messages can include the URL (and bot token).
         logger.warning("Telegram alert delivery failed: %s", type(exc).__name__)
         return
