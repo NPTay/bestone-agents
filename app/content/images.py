@@ -1,0 +1,120 @@
+"""Morning image sourcing: licensed stock (Pexels) or a Gemini illustration."""
+
+import logging
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Literal
+from uuid import uuid4
+
+import httpx
+from pydantic import BaseModel
+
+from app.config import Settings
+
+log = logging.getLogger(__name__)
+
+PEXELS_URL = "https://api.pexels.com/v1/search"
+NO_IMAGE_NOTE = (
+    "⚠️ Không lấy được ảnh (kho ảnh và AI đều lỗi). "
+    "Anh/chị có thể bấm Đăng để đăng không ảnh, hoặc góp ý."
+)
+
+
+class ImagePlan(BaseModel):
+    kind: Literal["stock", "ai"]
+    stock_query: str
+    ai_prompt: str
+
+
+@dataclass
+class ImageResult:
+    paths: list[str] = field(default_factory=list)
+    note: str = ""
+
+
+def _new_path(dest_dir: Path, suffix: str) -> Path:
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    return (dest_dir / f"{uuid4().hex}{suffix}").resolve()
+
+
+def _log_failure(what: str, exc: Exception) -> None:
+    # Type and HTTP status only: never headers, URLs with keys, or messages.
+    status = None
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+    log.warning("%s failed: %s status=%s", what, type(exc).__name__, status)
+
+
+def fetch_stock(query: str, dest_dir: Path, settings: Settings) -> ImageResult | None:
+    if not settings.PEXELS_API_KEY:
+        return None
+    try:
+        with httpx.Client(timeout=30, follow_redirects=True) as client:
+            resp = client.get(
+                PEXELS_URL,
+                params={"query": query, "per_page": 5, "orientation": "landscape"},
+                headers={"Authorization": settings.PEXELS_API_KEY},
+            )
+            resp.raise_for_status()
+            photos = resp.json().get("photos") or []
+            if not photos:
+                return None
+            photo = photos[0]
+            img = client.get(photo["src"]["large2x"])
+            img.raise_for_status()
+        path = _new_path(dest_dir, ".jpg")
+        path.write_bytes(img.content)
+        photographer = photo.get("photographer") or "Pexels"
+        return ImageResult(paths=[str(path)], note=f"Ảnh: Pexels – {photographer}")
+    except Exception as exc:  # noqa: BLE001 - never raise to the scheduler
+        _log_failure("pexels", exc)
+        return None
+
+
+def generate_ai(prompt: str, dest_dir: Path, settings: Settings) -> ImageResult | None:
+    if not settings.GEMINI_API_KEY:
+        return None
+    try:
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        response = client.models.generate_content(
+            model=settings.GEMINI_IMAGE_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(response_modalities=["IMAGE"]),
+        )
+        for candidate in response.candidates or []:
+            parts = candidate.content.parts if candidate.content else None
+            for part in parts or []:
+                data = part.inline_data.data if part.inline_data else None
+                if data:
+                    path = _new_path(dest_dir, ".png")
+                    path.write_bytes(data)
+                    return ImageResult(
+                        paths=[str(path)], note="Ảnh minh họa do AI (Gemini) tạo"
+                    )
+        log.warning("gemini returned no image")
+        return None
+    except Exception as exc:  # noqa: BLE001
+        _log_failure("gemini", exc)
+        return None
+
+
+def get_morning_image(plan: ImagePlan, dest_dir: Path, settings: Settings) -> ImageResult:
+    """Try the planned source first, then the other. Never raises."""
+    try:
+        attempts: list[Callable[[], ImageResult | None]] = [
+            lambda: fetch_stock(plan.stock_query, dest_dir, settings),
+            lambda: generate_ai(plan.ai_prompt, dest_dir, settings),
+        ]
+        if plan.kind == "ai":
+            attempts.reverse()
+        for attempt in attempts:
+            result = attempt()
+            if result is not None:
+                return result
+    except Exception as exc:  # noqa: BLE001
+        _log_failure("morning image", exc)
+    return ImageResult(paths=[], note=NO_IMAGE_NOTE)
