@@ -27,6 +27,7 @@ def test_install_guide_mentions_every_setup_command() -> None:
         "app.log",
         "Token Facebook hết hạn",
         "không rõ đã đăng",
+        "bị gián đoạn lúc đang đăng",
     ):
         assert needle in guide, needle
 

@@ -80,22 +80,22 @@ Bạn cần là **quản trị viên** của Fanpage.
 ```
 Mỗi dòng bắt đầu bằng ✅ (ổn) hoặc ❌ (lỗi, kèm lý do). Anthropic và Telegram phải ✅ (Telegram sẽ nhận một tin "Kiểm tra kết nối OK"). Pexels, Gemini, hai thư mục ảnh/tài liệu là tùy chọn. Facebook chỉ bắt buộc khi `DRY_RUN=false`.
 
-## 9. Chạy thử vài ngày với DRY_RUN=true
-Trong `.env`, `DRY_RUN=true` (mặc định) nghĩa là chương trình soạn bài, gửi Telegram, bạn duyệt, nhưng **không đăng thật lên Facebook**; chỉ ghi nhận "đã đăng" để bạn xem luồng chạy. Hãy chạy thử vài ngày để làm quen và xem chất lượng bài.
+## 9. Khởi động chương trình và chạy thử vài ngày với DRY_RUN=true
+Trước hết chắc rằng trong `.env` có `DRY_RUN=true` (mặc định). Chế độ này nghĩa là chương trình soạn bài, gửi Telegram, bạn duyệt, nhưng **không đăng thật lên Facebook**; chỉ ghi nhận "đã đăng" để bạn xem luồng chạy.
 
-Trang điều khiển (chỉ để xem): http://127.0.0.1:8765/ , trang "Hôm nay".
-
-## 10. Cho chương trình tự chạy khi Windows đăng nhập
+Đăng ký tự chạy khi Windows đăng nhập, rồi chạy ngay bây giờ:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install_autostart.ps1
 powershell -ExecutionPolicy Bypass -File scripts\start.ps1
 ```
-Dòng đầu đăng ký tự chạy (gỡ bỏ bằng `scripts\uninstall_autostart.ps1`); dòng sau chạy ngay bây giờ. Chương trình chạy ngầm, không hiện cửa sổ, và tự mở trang "Hôm nay". Nó làm việc khoảng 08:00 đến 20:00, nên máy cần bật trong giờ đó.
+Dòng đầu đăng ký tự chạy (gỡ bỏ bằng `scripts\uninstall_autostart.ps1`); dòng sau chạy ngay. Chương trình chạy ngầm, không hiện cửa sổ, và tự mở trang "Hôm nay" (chỉ để xem) tại http://127.0.0.1:8765/ . Telegram sẽ báo chương trình đã chạy. Chương trình làm việc khoảng 08:00 đến 20:00, nên máy cần bật trong giờ đó.
 
-## 11. Chuyển sang đăng thật
+Hãy chạy thử vài ngày để làm quen và xem chất lượng bài.
+
+## 10. Chuyển sang đăng thật
 Khi hài lòng: sửa `.env` thành `DRY_RUN=false`, lưu file, rồi khởi động lại chương trình (khởi động lại máy, hoặc chạy lại `scripts\start.ps1` sau khi tắt chương trình trong Task Manager). Chạy lại `setup_tools check` để chắc dòng Meta là ✅. Bài đầu tiên nên được bạn kiểm tra kỹ trên Fanpage.
 
-## 12. Điền thông tin công trình (mục 13 của kho tri thức)
+## 11. Điền thông tin công trình (mục 13 của kho tri thức)
 Bài chiều dùng ảnh trong `Picture`. Chương trình chỉ **nêu tên** một công trình khi bạn đã điền đủ thông tin.
 
 1. Mở `knowledge\bestone_knowledge_base.md` bằng Notepad, kéo xuống **mục 13**.
@@ -103,13 +103,13 @@ Bài chiều dùng ảnh trong `Picture`. Chương trình chỉ **nêu tên** m�
 3. Công trình nào còn sót dù chỉ một `[GĐ BỔ SUNG]` thì **không bao giờ được nêu tên** trong bài. Ảnh của nó vẫn có thể dùng, nhưng bài không nói đó là công trình nào. Đừng điền bừa: thông tin bạn điền sẽ được coi là sự thật và đăng lên.
 4. Lưu file rồi khởi động lại chương trình để nạp thông tin mới.
 
-## 13. Trích thông tin từ catalogue
+## 12. Trích thông tin từ catalogue
 ```powershell
 .venv\Scripts\python -m app.cli.catalogue
 ```
 Lệnh đọc các PDF trong `Tai Lieu` và tạo file `knowledge\catalogue_proposals.md` gồm hai nhóm "Bổ sung mới" và "Khác với tài liệu hiện có", mỗi mục kèm số trang. Chương trình **không** dùng file này. Bạn đọc, mục nào đúng thì tự chép sang `knowledge\bestone_knowledge_base.md`. Mục có dấu "cần Giám đốc xác nhận" (giá, bảo hành, tuổi thọ) chỉ chép khi bạn chắc chắn.
 
-## 14. Loại bớt ảnh không muốn đăng
+## 13. Loại bớt ảnh không muốn đăng
 Mặc định mọi ảnh `.jpg/.jpeg/.png` trong `Picture` đều có thể được dùng (video bị bỏ qua). Để loại một thư mục hoặc một ảnh: mở `config\picture_exclude.txt`, thêm mỗi dòng một đường dẫn tính từ thư mục `Picture` (ví dụ `MAU SAN PHAM BESTONE`). Dòng bắt đầu bằng `#` là ghi chú. Khởi động lại chương trình sau khi sửa.
 
 Muốn đổi chủ đề tìm tin cho bài sáng: sửa `config\research_queries.txt` (mỗi dòng một cụm từ tìm kiếm).
@@ -136,8 +136,10 @@ Nếu trang "Hôm nay" không mở hoặc Telegram im lặng:
 3. Chạy lại `setup_tools check` để xem khóa nào hỏng.
 
 ## Các cảnh báo trên Telegram
-- **"Token Facebook hết hạn hoặc bị thu hồi…"**: token Trang tuy dài hạn nhưng vẫn có thể hết hạn hoặc bị thu hồi (ví dụ đổi mật khẩu Facebook). Làm lại **bước 7.5 và 7.6**: tạo token ngắn hạn mới trong Graph API Explorer rồi chạy `setup_tools meta-token --user-token ...`. Sau đó khởi động lại chương trình.
-- **"không rõ đã đăng lên Facebook hay chưa"**: chương trình bị gián đoạn đúng lúc đăng. **Hãy mở Fanpage kiểm tra trước.** Nếu bài đã lên thì thôi; chỉ khi chắc chắn chưa lên mới tự đăng tay. **Không đăng lại bằng tay khi chưa kiểm tra**, kẻo trùng bài. Chương trình cố ý không tự thử lại bài này.
+- **"Token Facebook hết hạn hoặc bị thu hồi…"**: token Trang tuy dài hạn nhưng vẫn có thể hết hạn hoặc bị thu hồi (ví dụ đổi mật khẩu Facebook). Làm lại **mục 7, bước 5 và 6**: tạo token ngắn hạn mới trong Graph API Explorer rồi chạy `setup_tools meta-token --user-token ...`. Sau đó khởi động lại chương trình.
+- **"Bài … bị gián đoạn lúc đang đăng. Hãy mở Fanpage kiểm tra xem bài đã lên chưa — chương trình sẽ KHÔNG tự đăng lại để tránh trùng."**: chương trình bị tắt hoặc sập (mất điện, tắt máy, khởi động lại) đúng lúc đang đăng bài.
+- **"Bài …: không rõ đã đăng lên Facebook hay chưa (lỗi kết nối). Hãy mở Fanpage kiểm tra — chương trình sẽ KHÔNG tự đăng lại để tránh trùng."**: lúc đăng bị lỗi kết nối mạng nên không biết Facebook đã nhận bài hay chưa.
+- Với cả hai cảnh báo trên: **mở Fanpage kiểm tra trước.** Nếu bài đã lên thì thôi; chỉ khi chắc chắn chưa lên mới tự đăng tay. **Không đăng lại bằng tay khi chưa kiểm tra**, kẻo trùng bài.
 - **"… chưa được duyệt trước 20:00 nên đã bỏ"**: bình thường, không cần làm gì.
 
 ## Nơi lưu dữ liệu
