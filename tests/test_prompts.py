@@ -15,15 +15,29 @@ def test_all_agents_have_prompt() -> None:
         assert len(load_agent_prompt(agent)) > 50
 
 
-def test_care_prompt_content() -> None:
-    assert "TUYỆT ĐỐI không: báo giá" in load_agent_prompt("care")
+def test_agent_files_reduced_to_writer_and_judge() -> None:
+    assert set(AGENT_FILES) == {"content", "guardrail_judge"}
+
+
+def test_content_prompt_restates_format_rules() -> None:
+    prompt = load_agent_prompt("content")
+    for phrase in (
+        "Nhắn tin để nhận tài liệu kỹ thuật",
+        "0904834577",
+        "#Bestone",
+        "#ChongThamBeTong",
+        "#CGEngineeringVietNam",
+        "80-180 từ",
+        "theo tài liệu của nhà sản xuất",
+    ):
+        assert phrase in prompt
 
 
 def test_missing_block_raises(tmp_path: Path) -> None:
     (tmp_path / "agents").mkdir()
-    (tmp_path / "agents" / "a0_orchestrator.md").write_text("# no block", encoding="utf-8")
+    (tmp_path / "agents" / "a2_content.md").write_text("# no block", encoding="utf-8")
     with pytest.raises(PromptNotFoundError):
-        load_agent_prompt("orchestrator", root=tmp_path)
+        load_agent_prompt("content", root=tmp_path)
 
 
 def test_unknown_agent_raises_key_error() -> None:

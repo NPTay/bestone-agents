@@ -236,3 +236,25 @@ def check_rules(
         *_check_format(body, hashtags, cta),
         *_check_sources(sources, kb_refs),
     ]
+
+
+# ----------------------------------------------------------- project names
+
+# Folder names whose short form is how a writer would naturally name the project.
+_PROJECT_ALIASES: dict[str, tuple[str, ...]] = {
+    "Tòa nhà Kyobo": ("Kyobo",),
+    "교보 INSURANCE COMPANY (B1-B4)": ("교보",),
+}
+
+
+def check_project_names(text: str, unverified: list[str]) -> list[RuleFinding]:
+    """Flag any unverified picture-folder project named in the text (case-insensitive)."""
+    norm = _norm(text)
+    findings: list[RuleFinding] = []
+    for name in unverified:
+        tokens = (name, *_PROJECT_ALIASES.get(name, ()))
+        if any(re.search(rf"(?<!\w){re.escape(_norm(t))}(?!\w)", norm) for t in tokens):
+            findings.append(
+                RuleFinding("facts", f"Nêu tên công trình chưa có thông tin trong tài liệu: {name}")
+            )
+    return findings

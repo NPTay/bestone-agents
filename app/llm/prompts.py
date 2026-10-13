@@ -6,11 +6,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 AGENT_FILES: dict[str, str] = {
-    "orchestrator": "a0_orchestrator.md",
-    "research": "a1_research.md",
     "content": "a2_content.md",
-    "publisher": "a3_publisher.md",
-    "care": "a4_customer_care.md",
     "guardrail_judge": "guardrail_judge.md",
 }
 

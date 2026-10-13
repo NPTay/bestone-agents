@@ -249,3 +249,28 @@ def test_kb_facts_produce_no_findings(txt: str) -> None:
 
 def test_kb_price_numbers_not_whitelisted() -> None:
     assert not {"368000", "525000", "650000"} & kb_number_set(KB)
+
+
+# ------------------------------------------------------------ project names
+
+
+def test_check_project_names_flags_unverified_kyobo() -> None:
+    from app.guardrails.rules import check_project_names
+
+    text = "Bestone đã được dùng cho công trình Kyobo tại Hàn Quốc."
+    findings = check_project_names(text, ["Tòa nhà Kyobo"])
+    assert len(findings) == 1
+    assert findings[0].check == "facts"
+    assert findings[0].message == (
+        "Nêu tên công trình chưa có thông tin trong tài liệu: Tòa nhà Kyobo"
+    )
+
+
+def test_check_project_names_korean_token_and_case() -> None:
+    from app.guardrails.rules import check_project_names
+
+    unverified = ["교보 INSURANCE COMPANY (B1-B4)", "Warehouse - 80m of basement"]
+    assert len(check_project_names("Dự án 교보 dùng Bestone.", unverified)) == 1
+    assert len(check_project_names("WAREHOUSE - 80M OF BASEMENT", unverified)) == 1
+    assert check_project_names("Kho hàng tầng hầm sâu.", unverified) == []
+    assert check_project_names("Kyobo", []) == []
