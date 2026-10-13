@@ -1,42 +1,34 @@
 # 05 — Meta (Facebook) Integration
 
-> Claude Code: trước khi code, tra cứu tài liệu Meta for Developers hiện hành (phiên bản Graph API, tên quyền, quy trình App Review có thể đã đổi). Ghim phiên bản trong `config.py` (`META_GRAPH_VERSION`), không dùng "latest" ngầm định.
+> Trước khi sửa code Meta, tra cứu tài liệu Meta for Developers hiện hành (phiên bản Graph API, tên quyền, quy trình App Review có thể đã đổi). Phiên bản được ghim trong `META_GRAPH_VERSION` (`.env`), không dùng "latest" ngầm định.
 
-## Điều kiện tiên quyết (người dùng phải làm, hướng dẫn từng bước cho họ)
-1. Tài khoản Meta Business + Fanpage do chính công ty quản trị.
-2. Tạo Facebook App (loại Business), thêm sản phẩm Messenger và Webhooks.
-3. Xác minh doanh nghiệp (Business Verification) nếu Meta yêu cầu để cấp quyền nâng cao.
-4. Tạo Page Access Token dài hạn cho Page; lưu vào `.env` (`META_PAGE_ACCESS_TOKEN`), không commit.
-5. Đặt Callback URL webhook = `https://<domain>/webhook/meta`, Verify Token = `META_VERIFY_TOKEN`.
+Chương trình chạy trên máy tính, không có địa chỉ công khai, nên **không dùng webhook**. Tin nhắn Messenger (Đợt 2) sẽ lấy bằng cách hỏi định kỳ Graph API.
 
-## Quyền cần dùng (kiểm tra tên chính xác trong tài liệu hiện hành)
-| Mục đích | Quyền thường dùng |
-|---|---|
-| Đăng bài lên Page | `pages_manage_posts`, `pages_read_engagement`, `pages_show_list` |
-| Nhắn tin Messenger | `pages_messaging` |
-| Đọc/trả lời comment | `pages_read_user_content`, `pages_manage_engagement` |
-| Số liệu | `read_insights` |
-Ở chế độ Development, chỉ admin/tester của App dùng được. Cần App Review để phục vụ khách thật: chuẩn bị video demo, mô tả use case, chính sách quyền riêng tư (URL công khai).
+## Điều kiện tiên quyết
+Hướng dẫn từng bước cho Giám đốc nằm ở `docs/HUONG_DAN_CAI_DAT.md` mục 7: tạo Meta App loại Business, lấy App ID/Secret, token người dùng từ Graph API Explorer, rồi `python -m app.cli.setup_tools meta-token --user-token ...` đổi thành token Trang dài hạn và ghi vào `.env` (`META_PAGE_ACCESS_TOKEN`). Không commit token.
 
-## Webhook (`routers/webhook.py`)
-- `GET /webhook/meta`: xác thực `hub.verify_token`, trả `hub.challenge`.
-- `POST /webhook/meta`: BẮT BUỘC kiểm tra chữ ký `X-Hub-Signature-256` bằng App Secret; sai chữ ký trả 403.
-- Trả 200 nhanh (< 5 giây), đẩy xử lý vào hàng đợi `jobs`. Chống trùng bằng `messages.fb_mid`.
-- Đăng ký sự kiện: `messages`, `messaging_postbacks`, `feed` (comment).
+## Quyền
+| Mục đích | Quyền | Đợt |
+|---|---|---|
+| Đăng bài, bình luận lên Page | `pages_manage_posts`, `pages_read_engagement`, `pages_show_list` | 1 |
+| Nhắn tin Messenger | `pages_messaging` | 2 |
+| Đọc/trả lời bình luận khách | `pages_read_user_content`, `pages_manage_engagement` | ngoài phạm vi hiện tại |
 
-## Quy tắc nhắn tin
-- Cửa sổ 24 giờ: chỉ trả lời tự do trong 24 giờ kể từ tin cuối của khách. Ngoài cửa sổ: không gửi tự động; báo GĐ liên hệ qua điện thoại/Zalo.
-- Nút "Human handover": khi khách yêu cầu gặp người, dừng AI trên hội thoại đó (`conversations.status = waiting_human`).
-- Không gửi tin quảng bá hàng loạt. Không gửi lại tin đã gửi.
-- Bật typing indicator và trễ ngắn tự nhiên (2-5 giây) trước khi gửi.
+**Chế độ Development:** đăng bài lên Page do chính quản trị viên của App quản trị chạy được mà không cần App Review. Cần App Review (và có thể xác minh doanh nghiệp) khi phục vụ khách thật, tức Đợt 2: xem `docs/CHUAN_BI_APP_REVIEW.md`.
 
-## Đăng bài
-- Dùng Pages API `/{page-id}/feed` (text/link) và `/{page-id}/photos` (ảnh). Hỗ trợ lên lịch bằng `scheduled_publish_time` hoặc scheduler nội bộ (ưu tiên nội bộ để kiểm soát).
-- Sau khi đăng: lưu `fb_post_id`; lấy insights sau 1h, 24h, 7 ngày.
-- Tôn trọng giới hạn tốc độ: xử lý lỗi 4/17/32/613 (rate limit) bằng backoff; lỗi token (code 190) gửi cảnh báo urgent cho GĐ.
+## Đăng bài (`app/meta/graph.py`, `app/posts/publisher.py`)
+- Một ảnh đăng qua `/{page-id}/photos`; nhiều ảnh hoặc không ảnh qua `/{page-id}/feed`; sau đó bình luận cố định bằng `/{post-id}/comments`.
+- Lưu `fb_post_id` và `comment_id` vào DB. Lịch đăng do scheduler nội bộ kiểm soát, không dùng `scheduled_publish_time`.
+- Lỗi token (code 190): báo Telegram, không retry. Các lỗi Graph khác được ghi log và báo Giám đốc.
+- Lỗi mơ hồ sau khi gọi đăng (không biết đã lên hay chưa): không tự thử lại; báo Giám đốc kiểm tra Fanpage.
+- `DRY_RUN=true` thì không gọi các lệnh ghi.
 
-## Ảnh cho bài đăng
-Giai đoạn 1: A2 tạo `image_brief` (mô tả ảnh cần dùng); người dùng cung cấp ảnh thật từ thư viện công ty (`assets/`). Không tự sinh ảnh giả về công trình thật hoặc kết quả thí nghiệm. Ảnh/biểu đồ từ brochure chỉ dùng khi có quyền sử dụng của công ty.
+## Quy tắc nhắn tin (Đợt 2)
+- Cửa sổ 24 giờ: chỉ trả lời trong 24 giờ kể từ tin cuối của khách; quá hạn thì không gửi, báo Giám đốc gọi điện.
+- Không gửi tin quảng bá hàng loạt, không gửi lại tin đã gửi.
+
+## Ảnh
+Bài sáng: Pexels hoặc minh họa Gemini, không dùng ảnh từ báo/web. Bài chiều: ảnh trong `Picture/`. Ảnh AI không được giả làm công trình hay kết quả thí nghiệm thật.
 
 ## Tuân thủ
 Không scrape Facebook, không dùng tài khoản cá nhân giả, không tự động bình luận vào Page/Group người khác, không mua/bán tương tác.
