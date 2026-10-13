@@ -4,28 +4,25 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bestone-agents"
-version = "0.1.0"
-description = "Bestone AI agents for Facebook Fanpage management"
+version = "0.2.0"
+description = "Bestone desktop agents for Facebook Fanpage management"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi",
-    "uvicorn[standard]",
     "sqlalchemy>=2.0",
-    "alembic",
-    "psycopg[binary]>=3.1",
     "pydantic-settings",
+    "fastapi",
+    "uvicorn",
     "jinja2",
-    "python-multipart",
-    "argon2-cffi",
     "httpx",
     "tzdata",
     "anthropic>=1.0",
-    "feedparser",
-    "apscheduler>=3.10,<4",
+    "google-genai",
+    "beautifulsoup4",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "respx", "ruff", "mypy", "pyyaml", "types-PyYAML"]
+dev = ["pytest", "respx", "ruff", "mypy", "types-PyYAML", "types-beautifulsoup4"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
@@ -39,9 +36,6 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-filterwarnings = [
-    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
-]
 
 [tool.mypy]
 python_version = "3.12"

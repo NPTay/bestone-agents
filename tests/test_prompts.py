@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-from app.knowledge import ingest
 from app.llm.prompts import (
     AGENT_FILES,
     PromptNotFoundError,
@@ -42,7 +41,3 @@ def test_knowledge_loaded() -> None:
     }
     assert expected <= kb.keys()
 
-
-def test_ingest_ok(capsys: pytest.CaptureFixture[str]) -> None:
-    assert ingest.main() == 0
-    assert "bestone_knowledge_base.md" in capsys.readouterr().out
