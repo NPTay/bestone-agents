@@ -81,11 +81,24 @@ def test_expire_open_at_day_end(db: Session) -> None:
     done = pending(db, D, "afternoon")
     done.status = "published"
     db.commit()
-    assert store.expire_open(db, local(D, 19, 59)) == [yesterday]
+    assert store.expire_open(db, local(D, 19, 59)) == [(yesterday, "pending")]
     assert today.status == "pending"
-    assert store.expire_open(db, local(D, 20, 0)) == [today]
+    assert store.expire_open(db, local(D, 20, 0)) == [(today, "pending")]
     assert today.status == "expired"
     assert done.status == "published"
+
+
+def test_expire_open_reports_previous_status(db: Session) -> None:
+    approved = pending(db)
+    store.approve(db, approved.id, 1, local(D, 8, 30))
+    drafting = store.claim_slot(db, D, "afternoon")
+    assert drafting is not None
+    result = store.expire_open(db, local(D, 20, 0))
+    assert sorted((p.slot, prev) for p, prev in result) == [
+        ("afternoon", "drafting"),
+        ("morning", "approved"),
+    ]
+    assert approved.status == "expired" and drafting.status == "expired"
 
 
 def test_posts_for_day(db: Session) -> None:

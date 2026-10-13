@@ -102,15 +102,18 @@ def due_for_publish(db: Session, now: datetime) -> list[Post]:
     return [p for p in approved if publish_at(p.day, p.slot) <= now]  # type: ignore[arg-type]
 
 
-def expire_open(db: Session, now: datetime) -> list[Post]:
+def expire_open(db: Session, now: datetime) -> list[tuple[Post, str]]:
+    """Expire open posts whose day is over; returns (post, previous_status) pairs."""
     local = local_now(now)
     today = local.date()
     day_over = local.time() >= DAY_END
     open_posts = db.scalars(
         select(Post).where(Post.status.in_(("drafting", "pending", "approved")))
     ).all()
-    expired = [p for p in open_posts if p.day < today or (p.day == today and day_over)]
-    for p in expired:
+    expired = [
+        (p, p.status) for p in open_posts if p.day < today or (p.day == today and day_over)
+    ]
+    for p, _previous in expired:
         p.status = "expired"
     db.commit()
     return expired

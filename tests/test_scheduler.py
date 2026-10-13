@@ -11,7 +11,7 @@ from app import scheduler
 from app.config import Settings, get_settings
 from app.content.images import ImagePlan, ImageResult
 from app.content.research import Article
-from app.db.models import Alert, Post, ResearchItem
+from app.db.models import Alert, Post, ResearchItem, Setting
 from app.llm.client import FakeLLM
 from app.posts import store
 from app.scheduler import Deps, startup, tick
@@ -39,6 +39,7 @@ class Calls:
     def __init__(self) -> None:
         self.research = 0
         self.images = 0
+        self.fail_research = 0  # next N research calls raise (network down)
 
 
 def make_deps(
@@ -48,7 +49,6 @@ def make_deps(
     bot: FakeTelegram,
     calls: Calls,
     articles: list[Article] | None = None,
-    research_error: Exception | None = None,
 ) -> Deps:
     found = [ARTICLE] if articles is None else articles
 
@@ -56,8 +56,9 @@ def make_deps(
         llm: Any, db: Session, queries: list[str], job_id: Any, **kw: Any
     ) -> list[Article]:
         calls.research += 1
-        if research_error is not None:
-            raise research_error
+        if calls.fail_research > 0:
+            calls.fail_research -= 1
+            raise OSError("network down")
         assert queries, "queries come from config/research_queries.txt"
         for a in found:
             db.add(
@@ -90,6 +91,16 @@ def make_deps(
         max_attempts=1,
         sleep=lambda _s: None,
     )
+
+
+class DeadTelegram(FakeTelegram):
+    def send_message(
+        self,
+        text: str,
+        buttons: list[tuple[str, str]] | None = None,
+        reply_to: int | None = None,
+    ) -> int:
+        raise OSError("offline")
 
 
 def morning_llm() -> FakeLLM:
@@ -280,25 +291,176 @@ def test_no_research_results_skips_writer(
     assert texts(bot) == ["Sáng nay không tìm được tin phù hợp nên không có bài sáng."]
 
 
-def test_missing_llm_marks_failed_and_alerts(
-    db: Session, db_factory: SessionFactory, dirs: Path
-) -> None:
-    tick(make_deps(db_factory, dirs, None, FakeTelegram(), Calls()), local(D, 8, 0))
-    [post] = posts(db)
-    assert post.status == "failed" and post.error
-    assert any("bài sáng" in m for m in alerts(db))
+def slot_alerts(db: Session) -> list[str]:
+    """Alerts written by the scheduler itself (run_job's generic ones excluded)."""
+    return [m for m in alerts(db) if not m.startswith("Tác vụ ")]
 
 
-def test_job_failure_marks_failed_and_alerts(
+def test_network_failure_at_0800_retries_after_10_minutes(
     db: Session, db_factory: SessionFactory, dirs: Path
 ) -> None:
-    deps = make_deps(
-        db_factory, dirs, morning_llm(), FakeTelegram(), Calls(), research_error=OSError("net")
-    )
+    calls, bot = Calls(), FakeTelegram()
+    calls.fail_research = 1
+    deps = make_deps(db_factory, dirs, morning_llm(), bot, calls)
+
     tick(deps, local(D, 8, 0))
+    assert posts(db) == []  # slot freed, no failed row
+    assert slot_alerts(db) == []
+
+    tick(deps, local(D, 8, 5))
+    assert calls.research == 1  # too soon to retry
+
+    tick(deps, local(D, 8, 11))
+    assert calls.research == 2
     [post] = posts(db)
-    assert post.status == "failed" and post.error
-    assert any("Không soạn được bài sáng" in m for m in alerts(db))
+    assert post.status == "pending" and post.telegram_message_id is not None
+    assert slot_alerts(db) == []
+
+
+def test_three_draft_failures_give_one_failed_row_and_one_alert(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    calls = Calls()
+    calls.fail_research = 5
+    deps = make_deps(db_factory, dirs, morning_llm(), FakeTelegram(), calls)
+    for minute in (0, 10, 20, 30, 40):
+        tick(deps, local(D, 8, minute))
+    assert calls.research == 3
+    [post] = posts(db)
+    assert post.status == "failed" and post.error == "Soạn bài thất bại"
+    assert slot_alerts(db) == ["Không soạn được bài sáng hôm nay (lỗi khi tìm tin/viết bài)."]
+    tick(deps, local(D, 20, 0))  # failed row exists: no "lost slot" alert on top
+    assert len(slot_alerts(db)) == 1
+
+
+def test_missing_llm_is_retried_then_fails_with_one_alert(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    deps = make_deps(db_factory, dirs, None, FakeTelegram(), Calls())
+    tick(deps, local(D, 8, 0))
+    assert posts(db) == [] and slot_alerts(db) == []
+    tick(deps, local(D, 8, 10))
+    tick(deps, local(D, 8, 20))
+    [post] = posts(db)
+    assert post.status == "failed" and post.error == "Chưa cấu hình AI"
+    assert slot_alerts(db) == ["Không soạn được bài sáng: chưa cấu hình AI."]
+
+
+def test_window_closes_after_failures_alerts_once_at_day_end(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    calls = Calls()
+    calls.fail_research = 1
+    deps = make_deps(db_factory, dirs, morning_llm(), FakeTelegram(), calls)
+    tick(deps, local(D, 11, 55))  # one failure, then the morning window closes
+    tick(deps, local(D, 12, 10))
+    assert posts(db) == [] and slot_alerts(db) == []
+
+    tick(deps, local(D, 20, 0))
+    tick(deps, local(D, 20, 1))
+    assert slot_alerts(db) == ["Hôm nay không soạn được bài sáng (lỗi kết nối/AI)."]
+    row = db.scalar(select(Setting).where(Setting.key == "DRAFT_RETRY:2026-10-13:morning"))
+    assert row is not None and row.value.startswith("1|") and row.value.endswith("|notified")
+
+
+def test_startup_deletes_orphaned_drafting_row_while_window_open(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    orphan = store.claim_slot(db, D, "morning")  # PC switched off mid-draft
+    assert orphan is not None
+    orphan_id = orphan.id
+    calls = Calls()
+    startup(make_deps(db_factory, dirs, morning_llm(), FakeTelegram(), calls), local(D, 9, 30))
+    [post] = posts(db)
+    assert post.status == "pending" and post.id != orphan_id
+    assert calls.research == 1
+    assert slot_alerts(db) == []
+
+
+def test_startup_fails_orphaned_drafting_row_after_window(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    assert store.claim_slot(db, D, "morning") is not None
+    calls = Calls()
+    startup(make_deps(db_factory, dirs, morning_llm(), FakeTelegram(), calls), local(D, 13, 0))
+    [post] = posts(db)
+    assert post.status == "failed" and post.error == "Bị gián đoạn khi đang soạn"
+    assert calls.research == 0
+    assert slot_alerts(db) == [
+        "Bài sáng 13/10 bị gián đoạn khi đang soạn (máy tắt) nên không có bài."
+    ]
+
+
+def test_context_failure_does_not_leave_drafting_row(
+    db: Session, db_factory: SessionFactory, dirs: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*_a: Any) -> Any:
+        raise FileNotFoundError("kb missing")
+
+    monkeypatch.setattr(scheduler, "load_knowledge", broken)
+    tick(make_deps(db_factory, dirs, morning_llm(), FakeTelegram(), Calls()), local(D, 8, 0))
+    assert [p.status for p in posts(db)] == ["failed"]
+
+
+def test_unsent_pending_post_is_resent_on_next_tick(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    post = store.claim_slot(db, D, "morning")
+    assert post is not None
+    store.save_draft(db, post, draft(), REPORT, False)  # never reached Telegram
+    bot = FakeTelegram()
+    deps = make_deps(db_factory, dirs, None, bot, Calls())
+    tick(deps, local(D, 8, 30))
+    [post] = posts(db)
+    sent = [s for s in bot.sent if s["method"] == "send_message"]
+    assert len(sent) == 1 and post.telegram_message_id == sent[0]["message_id"]
+    tick(deps, local(D, 8, 31))
+    assert len([s for s in bot.sent if s["method"] == "send_message"]) == 1
+
+
+def test_resend_failure_does_not_alert_every_tick(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    post = store.claim_slot(db, D, "morning")
+    assert post is not None
+    store.save_draft(db, post, draft(), REPORT, False)
+    deps = make_deps(db_factory, dirs, None, DeadTelegram(), Calls())
+    tick(deps, local(D, 8, 30))
+    tick(deps, local(D, 8, 31))
+    assert alerts(db) == []
+    assert posts(db)[0].telegram_message_id is None
+
+
+def test_unsent_post_expiry_says_it_never_reached_telegram(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    post = store.claim_slot(db, D, "afternoon")
+    assert post is not None
+    store.save_draft(db, post, draft(), REPORT, False)
+    bot = FakeTelegram()
+    tick(make_deps(db_factory, dirs, None, bot, Calls()), local(D, 20, 0))
+    assert posts(db)[0].status == "expired"
+    assert texts(bot) == ["⏰ Bài chiều 13/10 chưa gửi được lên Telegram nên đã bỏ."]
+    assert not any(s["method"] == "edit_buttons_removed" for s in bot.sent)
+
+
+def test_approved_post_expiry_says_pc_was_off(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    post = store.claim_slot(db, D, "morning")
+    assert post is not None
+    store.save_draft(db, post, draft(), REPORT, False)
+    post.telegram_message_id = 50
+    db.commit()
+    store.approve(db, post.id, 1, local(D, 8, 30))
+    bot = FakeTelegram()
+    # PC was off from before 09:00 until after 20:00.
+    tick(make_deps(db_factory, dirs, None, bot, Calls()), local(D, 20, 30))
+    [post] = posts(db)
+    assert post.status == "expired" and post.fb_post_id is None
+    assert texts(bot) == [
+        "⏰ Bài sáng 13/10 đã được duyệt nhưng máy tắt nên không đăng được trong ngày, đã bỏ."
+    ]
 
 
 def test_one_step_failure_does_not_block_publishing(
@@ -324,15 +486,6 @@ def test_one_step_failure_does_not_block_publishing(
 def test_review_send_failure_keeps_post_pending_and_alerts(
     db: Session, db_factory: SessionFactory, dirs: Path
 ) -> None:
-    class DeadTelegram(FakeTelegram):
-        def send_message(
-            self,
-            text: str,
-            buttons: list[tuple[str, str]] | None = None,
-            reply_to: int | None = None,
-        ) -> int:
-            raise OSError("offline")
-
     tick(make_deps(db_factory, dirs, morning_llm(), DeadTelegram(), Calls()), local(D, 8, 0))
     [post] = posts(db)
     assert post.status == "pending" and post.telegram_message_id is None

@@ -73,11 +73,17 @@ def send_for_review(bot: _Bot, post: Post) -> int:
 
 
 def send_for_review_safe(
-    bot: _Bot, post: Post, db: Session, alert_text: str | None = None
+    bot: _Bot,
+    post: Post,
+    db: Session,
+    alert_text: str | None = None,
+    *,
+    alert: bool = True,
 ) -> int | None:
     """Send for review; retry once, then fall back to plain text, then alert.
 
     Returns the Telegram message id, or None when nothing could be sent.
+    ``alert=False`` only logs the failure (used by periodic resends).
     """
     for _ in range(2):
         try:
@@ -88,6 +94,8 @@ def send_for_review_safe(
         return bot.send_message(format_review(post), buttons=_buttons(post))
     except (TelegramError, OSError) as exc:
         logger.warning("Plain-text review fallback failed: %s", type(exc).__name__)
+    if not alert:
+        return None
     slot = "sáng" if post.slot == "morning" else "chiều"
     send_alert(db, "warn", alert_text or f"Không gửi được bài {slot} lên Telegram.")
     return None
