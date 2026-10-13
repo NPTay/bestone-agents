@@ -271,6 +271,7 @@ def _draft_morning(deps: Deps, day: date, now: datetime, post_id: uuid.UUID) -> 
         fn=work,
         max_attempts=deps.max_attempts,
         sleep=deps.sleep,
+        alert_on_failure=False,  # the scheduler owns the slot alerts (R12)
     )
     if result is None:
         _retryable_failure(
@@ -332,6 +333,7 @@ def _draft_afternoon(deps: Deps, day: date, now: datetime, post_id: uuid.UUID) -
         fn=work,
         max_attempts=deps.max_attempts,
         sleep=deps.sleep,
+        alert_on_failure=False,  # the scheduler owns the slot alerts (R12)
     )
     if result is None:
         _retryable_failure(

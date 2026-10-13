@@ -291,11 +291,6 @@ def test_no_research_results_skips_writer(
     assert texts(bot) == ["Sáng nay không tìm được tin phù hợp nên không có bài sáng."]
 
 
-def slot_alerts(db: Session) -> list[str]:
-    """Alerts written by the scheduler itself (run_job's generic ones excluded)."""
-    return [m for m in alerts(db) if not m.startswith("Tác vụ ")]
-
-
 def test_network_failure_at_0800_retries_after_10_minutes(
     db: Session, db_factory: SessionFactory, dirs: Path
 ) -> None:
@@ -305,7 +300,7 @@ def test_network_failure_at_0800_retries_after_10_minutes(
 
     tick(deps, local(D, 8, 0))
     assert posts(db) == []  # slot freed, no failed row
-    assert slot_alerts(db) == []
+    assert alerts(db) == []
 
     tick(deps, local(D, 8, 5))
     assert calls.research == 1  # too soon to retry
@@ -314,7 +309,7 @@ def test_network_failure_at_0800_retries_after_10_minutes(
     assert calls.research == 2
     [post] = posts(db)
     assert post.status == "pending" and post.telegram_message_id is not None
-    assert slot_alerts(db) == []
+    assert alerts(db) == []
 
 
 def test_three_draft_failures_give_one_failed_row_and_one_alert(
@@ -328,9 +323,9 @@ def test_three_draft_failures_give_one_failed_row_and_one_alert(
     assert calls.research == 3
     [post] = posts(db)
     assert post.status == "failed" and post.error == "Soạn bài thất bại"
-    assert slot_alerts(db) == ["Không soạn được bài sáng hôm nay (lỗi khi tìm tin/viết bài)."]
+    assert alerts(db) == ["Không soạn được bài sáng hôm nay (lỗi khi tìm tin/viết bài)."]
     tick(deps, local(D, 20, 0))  # failed row exists: no "lost slot" alert on top
-    assert len(slot_alerts(db)) == 1
+    assert len(alerts(db)) == 1
 
 
 def test_missing_llm_is_retried_then_fails_with_one_alert(
@@ -338,12 +333,12 @@ def test_missing_llm_is_retried_then_fails_with_one_alert(
 ) -> None:
     deps = make_deps(db_factory, dirs, None, FakeTelegram(), Calls())
     tick(deps, local(D, 8, 0))
-    assert posts(db) == [] and slot_alerts(db) == []
+    assert posts(db) == [] and alerts(db) == []
     tick(deps, local(D, 8, 10))
     tick(deps, local(D, 8, 20))
     [post] = posts(db)
     assert post.status == "failed" and post.error == "Chưa cấu hình AI"
-    assert slot_alerts(db) == ["Không soạn được bài sáng: chưa cấu hình AI."]
+    assert alerts(db) == ["Không soạn được bài sáng: chưa cấu hình AI."]
 
 
 def test_window_closes_after_failures_alerts_once_at_day_end(
@@ -354,11 +349,11 @@ def test_window_closes_after_failures_alerts_once_at_day_end(
     deps = make_deps(db_factory, dirs, morning_llm(), FakeTelegram(), calls)
     tick(deps, local(D, 11, 55))  # one failure, then the morning window closes
     tick(deps, local(D, 12, 10))
-    assert posts(db) == [] and slot_alerts(db) == []
+    assert posts(db) == [] and alerts(db) == []
 
     tick(deps, local(D, 20, 0))
     tick(deps, local(D, 20, 1))
-    assert slot_alerts(db) == ["Hôm nay không soạn được bài sáng (lỗi kết nối/AI)."]
+    assert alerts(db) == ["Hôm nay không soạn được bài sáng (lỗi kết nối/AI)."]
     row = db.scalar(select(Setting).where(Setting.key == "DRAFT_RETRY:2026-10-13:morning"))
     assert row is not None and row.value.startswith("1|") and row.value.endswith("|notified")
 
@@ -374,7 +369,7 @@ def test_startup_deletes_orphaned_drafting_row_while_window_open(
     [post] = posts(db)
     assert post.status == "pending" and post.id != orphan_id
     assert calls.research == 1
-    assert slot_alerts(db) == []
+    assert alerts(db) == []
 
 
 def test_startup_fails_orphaned_drafting_row_after_window(
@@ -386,7 +381,7 @@ def test_startup_fails_orphaned_drafting_row_after_window(
     [post] = posts(db)
     assert post.status == "failed" and post.error == "Bị gián đoạn khi đang soạn"
     assert calls.research == 0
-    assert slot_alerts(db) == [
+    assert alerts(db) == [
         "Bài sáng 13/10 bị gián đoạn khi đang soạn (máy tắt) nên không có bài."
     ]
 

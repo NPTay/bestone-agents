@@ -53,10 +53,13 @@ def run_job[T](
     max_attempts: int = 3,
     backoff_base_s: float = 2.0,
     sleep: Callable[[float], None] = time.sleep,
+    alert_on_failure: bool = True,
 ) -> T | None:
     """Run fn with bounded retries, recording the outcome in the jobs table.
 
     Returns fn's result, or None after the final failed attempt (never raises).
+    ``alert_on_failure=False`` skips the failure alerts (the caller owns them);
+    the job is still recorded as failed and logged.
     """
     with db_factory() as db:
         job = Job(
@@ -91,6 +94,8 @@ def run_job[T](
         return result
 
     _update_job(db_factory, job_id, status="failed", error=last_error, finished_at=clock.utcnow())
+    if not alert_on_failure:
+        return None
     with db_factory() as db:
         if _recent_all_failed(db, kind):
             send_alert(db, "urgent", f"Tác vụ {kind} thất bại 3 lần liên tiếp — cần kiểm tra")

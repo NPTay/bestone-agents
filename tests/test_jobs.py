@@ -102,3 +102,28 @@ def test_llm_error_text_and_truncation(db_factory: Callable[[], orm.Session]) ->
     )
     err = [j for j in _jobs(db_factory) if j.kind == "k2"][0].error
     assert err is not None and len(err) == 2000
+
+
+def test_alert_on_failure_false_skips_alerts_but_records_failure(
+    db_factory: Callable[[], orm.Session],
+) -> None:
+    def fn(db: orm.Session, job_id: uuid.UUID) -> str:
+        raise RuntimeError("boom")
+
+    for _ in range(3):  # would otherwise reach the urgent streak too
+        result = run_job(
+            db_factory,
+            agent="content",
+            kind="draft_morning",
+            payload={},
+            fn=fn,
+            max_attempts=1,
+            sleep=lambda s: None,
+            alert_on_failure=False,
+        )
+        assert result is None
+    jobs = _jobs(db_factory)
+    assert [j.status for j in jobs] == ["failed"] * 3
+    assert all(j.error == "RuntimeError: boom" for j in jobs)
+    with db_factory() as s:
+        assert s.scalars(select(Alert)).all() == []
