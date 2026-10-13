@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -89,14 +89,48 @@ def test_compose_message(db: orm.Session) -> None:
     assert "Nguồn" not in compose_message(morning)
 
 
-def test_publish_post_marks_publishing_before_call(db: orm.Session) -> None:
+def test_publish_post_marks_publishing_before_call(
+    db: orm.Session, db_factory: Callable[[], orm.Session]
+) -> None:
     post = make_post(db)
     graph = FakeGraph()
     seen: list[str] = []
-    graph.on_publish = lambda: seen.append(db.get(Post, post.id).status)  # type: ignore[union-attr]
+
+    def peek() -> None:
+        # A second session sees only committed data.
+        with db_factory() as other:
+            seen.append(other.get(Post, post.id).status)  # type: ignore[union-attr]
+
+    graph.on_publish = peek
     publish_post(db, graph, FakeTelegram(), post, NOW, dry_run=False)
     assert seen == ["publishing"]
     assert post.status == "published"
+
+
+@pytest.mark.parametrize("status", ["published", "pending", "failed", "publishing"])
+def test_publish_post_refuses_non_approved(db: orm.Session, status: str) -> None:
+    post = make_post(db)
+    post.status = status
+    db.commit()
+    graph, bot = FakeGraph(), FakeTelegram()
+    publish_post(db, graph, bot, post, NOW, dry_run=False)
+    publish_post(db, None, bot, post, NOW, dry_run=True)
+    assert not graph.published and not graph.comments and not bot.sent
+    assert post.status == status and post.fb_post_id is None
+
+
+def test_ambiguous_transport_failure_alerts_urgent(db: orm.Session) -> None:
+    post = make_post(db, "morning")
+    graph = FakeGraph()
+    graph.publish_error = GraphError(-1, "ReadTimeout")
+    publish_post(db, graph, FakeTelegram(), post, NOW, dry_run=False)
+    assert post.status == "failed"
+    alert = db.query(Alert).one()
+    assert alert.level == "urgent"
+    assert alert.message == (
+        "Bài sáng 13/10: không rõ đã đăng lên Facebook hay chưa (lỗi kết nối). "
+        "Hãy mở Fanpage kiểm tra — chương trình sẽ KHÔNG tự đăng lại để tránh trùng."
+    )
 
 
 def test_publish_post_adds_comment_and_records_picture_use(db: orm.Session, env: Path) -> None:

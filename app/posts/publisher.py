@@ -86,6 +86,11 @@ def publish_post(
     now: datetime,
     dry_run: bool,
 ) -> None:
+    # Last gate before an irreversible write: only an approved post may go out.
+    db.refresh(post)
+    if post.status != "approved":
+        logger.warning("Refusing to publish post in status %s", post.status)
+        return
     slot = _slot_vi(post)
     if graph is None and not dry_run:
         _fail(db, post, "Chưa cấu hình Facebook")
@@ -113,6 +118,15 @@ def publish_post(
         _fail(db, post, exc.message)
         if exc.code == 190:
             send_alert(db, "urgent", TOKEN_EXPIRED_TEXT)
+        elif exc.code == -1:
+            # Transport failure: the request may have reached Facebook.
+            send_alert(
+                db,
+                "urgent",
+                f"Bài {slot} {post.day:%d/%m}: không rõ đã đăng lên Facebook hay chưa "
+                "(lỗi kết nối). Hãy mở Fanpage kiểm tra — chương trình sẽ KHÔNG tự đăng lại "
+                "để tránh trùng.",
+            )
         else:
             send_alert(db, "warn", f"Đăng bài {slot} thất bại: {exc.message}")
         return

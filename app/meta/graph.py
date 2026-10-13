@@ -50,6 +50,13 @@ class GraphClient:
             body = resp.json()
         except ValueError:
             body = None
+        self._raise_if_error(body)
+        if resp.status_code >= 400 or not isinstance(body, dict):
+            raise GraphError(-1, f"HTTP {resp.status_code}") from None
+        return body
+
+    def _raise_if_error(self, body: Any) -> None:
+        """Raise GraphError when `body` is a Graph error payload (token scrubbed)."""
         if isinstance(body, dict) and isinstance(body.get("error"), dict):
             err = body["error"]
             code = err.get("code")
@@ -57,9 +64,6 @@ class GraphClient:
                 code if isinstance(code, int) else -1,
                 self._scrub(str(err.get("message", "Unknown error"))),
             ) from None
-        if resp.status_code >= 400 or not isinstance(body, dict):
-            raise GraphError(-1, f"HTTP {resp.status_code}") from None
-        return body
 
     def _upload_photo(self, path: str, data: dict[str, str]) -> dict[str, Any]:
         with ExitStack() as stack:
@@ -99,13 +103,7 @@ class GraphClient:
             raise GraphError(-1, type(exc).__name__) from None
         except ValueError:
             raise GraphError(-1, "Invalid response") from None
-        if isinstance(body, dict) and isinstance(body.get("error"), dict):
-            err = body["error"]
-            code = err.get("code")
-            raise GraphError(
-                code if isinstance(code, int) else -1,
-                self._scrub(str(err.get("message", "Unknown error"))),
-            ) from None
+        self._raise_if_error(body)
         if resp.status_code >= 400 or not isinstance(body, dict) or "name" not in body:
             raise GraphError(-1, f"HTTP {resp.status_code}") from None
         return str(body["name"])
