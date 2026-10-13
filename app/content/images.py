@@ -1,10 +1,10 @@
-"""Morning image sourcing: licensed stock (Pexels) or a Gemini illustration."""
+"""Morning image sourcing: licensed stock (Unsplash) or a Gemini illustration."""
 
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 import httpx
@@ -14,7 +14,7 @@ from app.config import Settings
 
 log = logging.getLogger(__name__)
 
-PEXELS_URL = "https://api.pexels.com/v1/search"
+UNSPLASH_SEARCH_URL = "https://api.unsplash.com/search/photos"
 NO_IMAGE_NOTE = (
     "⚠️ Không lấy được ảnh (kho ảnh và AI đều lỗi). "
     "Anh/chị có thể bấm Đăng để đăng không ảnh, hoặc góp ý."
@@ -47,29 +47,47 @@ def _log_failure(what: str, exc: Exception) -> None:
 
 
 def fetch_stock(query: str, dest_dir: Path, settings: Settings) -> ImageResult | None:
-    if not settings.PEXELS_API_KEY:
+    if not settings.UNSPLASH_ACCESS_KEY:
         return None
+    auth = {"Authorization": f"Client-ID {settings.UNSPLASH_ACCESS_KEY}", "Accept-Version": "v1"}
     try:
         with httpx.Client(timeout=30, follow_redirects=True) as client:
             resp = client.get(
-                PEXELS_URL,
-                params={"query": query, "per_page": 5, "orientation": "landscape"},
-                headers={"Authorization": settings.PEXELS_API_KEY},
+                UNSPLASH_SEARCH_URL,
+                params={
+                    "query": query,
+                    "per_page": 5,
+                    "orientation": "landscape",
+                    "content_filter": "high",
+                },
+                headers=auth,
             )
             resp.raise_for_status()
-            photos = resp.json().get("photos") or []
-            if not photos:
+            results = resp.json().get("results") or []
+            if not results:
                 return None
-            photo = photos[0]
-            img = client.get(photo["src"]["large2x"])
+            photo = results[0]
+            img = client.get(photo["urls"]["regular"])
             img.raise_for_status()
+            _track_download(client, photo, auth)
         path = _new_path(dest_dir, ".jpg")
         path.write_bytes(img.content)
-        photographer = photo.get("photographer") or "Pexels"
-        return ImageResult(paths=[str(path)], note=f"Ảnh: Pexels – {photographer}")
+        author = (photo.get("user") or {}).get("name") or "Unsplash"
+        return ImageResult(paths=[str(path)], note=f"Ảnh: {author} / Unsplash")
     except Exception as exc:  # noqa: BLE001 - never raise to the scheduler
-        _log_failure("pexels", exc)
+        _log_failure("unsplash", exc)
         return None
+
+
+def _track_download(client: httpx.Client, photo: dict[str, Any], auth: dict[str, str]) -> None:
+    """Unsplash API guidelines require hitting download_location when a photo is used."""
+    url = (photo.get("links") or {}).get("download_location")
+    if not url:
+        return
+    try:
+        client.get(url, headers=auth).raise_for_status()
+    except Exception as exc:  # noqa: BLE001 - tracking must not cost us the photo
+        _log_failure("unsplash download tracking", exc)
 
 
 def generate_ai(prompt: str, dest_dir: Path, settings: Settings) -> ImageResult | None:

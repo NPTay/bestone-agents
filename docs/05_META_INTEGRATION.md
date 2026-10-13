@@ -28,7 +28,7 @@ Hướng dẫn từng bước cho Giám đốc nằm ở `docs/HUONG_DAN_CAI_DAT
 - Không gửi tin quảng bá hàng loạt, không gửi lại tin đã gửi.
 
 ## Ảnh
-Bài sáng: Pexels hoặc minh họa Gemini, không dùng ảnh từ báo/web. Bài chiều: ảnh trong `Picture/`. Ảnh AI không được giả làm công trình hay kết quả thí nghiệm thật.
+Bài sáng: Unsplash hoặc minh họa Gemini, không dùng ảnh từ báo/web. Bài chiều: ảnh trong `Picture/`. Ảnh AI không được giả làm công trình hay kết quả thí nghiệm thật.
 
 ## Tuân thủ
 Không scrape Facebook, không dùng tài khoản cá nhân giả, không tự động bình luận vào Page/Group người khác, không mua/bán tương tác.

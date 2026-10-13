@@ -38,15 +38,19 @@ Chỉ tin nhắn từ chat id này mới được chương trình nghe theo.
 2. Mục **API Keys** > tạo khóa mới.
 3. Dán vào `.env`: `ANTHROPIC_API_KEY=<khóa>`.
 
-## 5. Lấy khóa Pexels (ảnh bản quyền cho bài sáng)
-1. Vào https://www.pexels.com/api/ và đăng ký (miễn phí).
-2. Dán khóa vào `.env`: `PEXELS_API_KEY=<khóa>`.
+## 5. Lấy khóa Unsplash (ảnh bản quyền cho bài sáng)
+1. Vào https://unsplash.com/developers, đăng ký, bấm **New Application** (miễn phí).
+2. Trong trang ứng dụng, chép **Access Key** (không cần Secret Key).
+3. Dán vào `.env`: `UNSPLASH_ACCESS_KEY=<Access Key>`.
+4. Bài dùng ảnh Unsplash sẽ ghi tên tác giả ("Ảnh: <tên> / Unsplash") như Unsplash yêu cầu.
 
 ## 6. Lấy khóa Gemini (ảnh minh họa AI cho bài sáng)
 1. Vào https://aistudio.google.com/apikey, tạo khóa.
 2. Dán vào `.env`: `GEMINI_API_KEY=<khóa>`.
+3. **Bắt buộc bật thanh toán (Billing)** cho dự án Google của khóa này: gói miễn phí không cho tạo ảnh (lỗi "429 RESOURCE_EXHAUSTED / exceeded your current quota"). Vào https://aistudio.google.com → **Billing** → liên kết tài khoản thanh toán.
+4. Mẫu tạo ảnh: `GEMINI_IMAGE_MODEL=gemini-3.1-flash-lite-image` (rẻ nhất, đủ cho ảnh minh họa). Muốn ảnh đẹp hơn thì đổi thành `gemini-3.1-flash-image`.
 
-Pexels và Gemini không bắt buộc, nhưng thiếu cả hai thì bài sáng sẽ không có ảnh (bài vẫn gửi Telegram kèm cảnh báo).
+Unsplash và Gemini không bắt buộc, nhưng thiếu cả hai thì bài sáng sẽ không có ảnh (bài vẫn gửi Telegram kèm cảnh báo).
 
 ## 7. Tạo Meta App và lấy token Trang Facebook
 Bạn cần là **quản trị viên** của Fanpage.
@@ -78,7 +82,7 @@ Bạn cần là **quản trị viên** của Fanpage.
 ```powershell
 .venv\Scripts\python -m app.cli.setup_tools check
 ```
-Mỗi dòng bắt đầu bằng ✅ (ổn) hoặc ❌ (lỗi, kèm lý do). Anthropic và Telegram phải ✅ (Telegram sẽ nhận một tin "Kiểm tra kết nối OK"). Pexels, Gemini, hai thư mục ảnh/tài liệu là tùy chọn. Facebook chỉ bắt buộc khi `DRY_RUN=false`.
+Mỗi dòng bắt đầu bằng ✅ (ổn) hoặc ❌ (lỗi, kèm lý do). Anthropic và Telegram phải ✅ (Telegram sẽ nhận một tin "Kiểm tra kết nối OK"). Unsplash, Gemini, hai thư mục ảnh/tài liệu là tùy chọn. Facebook chỉ bắt buộc khi `DRY_RUN=false`.
 
 ## 9. Khởi động chương trình và chạy thử vài ngày với DRY_RUN=true
 Trước hết chắc rằng trong `.env` có `DRY_RUN=true` (mặc định). Chế độ này nghĩa là chương trình soạn bài, gửi Telegram, bạn duyệt, nhưng **không đăng thật lên Facebook**; chỉ ghi nhận "đã đăng" để bạn xem luồng chạy.

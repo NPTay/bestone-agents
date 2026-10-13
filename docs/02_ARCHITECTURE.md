@@ -7,7 +7,7 @@ Một tiến trình Python duy nhất (`python -m app`, chạy ngầm bằng `py
 |---|---|---|
 | Runner | `app/runner.py` | Khóa một-tiến-trình, ghi log `data/logs/app.log`, chạy 3 luồng: vòng `tick` mỗi 60 giây, poller Telegram, web "Hôm nay" |
 | Scheduler | `app/scheduler.py`, `app/schedule_times.py` | Quyết định mỗi tick: soạn bài sáng/chiều, đăng bài đã duyệt, bỏ bài quá 20:00, thử lại soạn lỗi (10 phút/lần, tối đa 3) |
-| Nội dung | `app/content/` | `research.py` tìm tin (bài sáng), `pictures.py` chọn ảnh `Picture`, `images.py` Pexels/Gemini, `writer.py` viết và sửa bài |
+| Nội dung | `app/content/` | `research.py` tìm tin (bài sáng), `pictures.py` chọn ảnh `Picture`, `images.py` Unsplash/Gemini, `writer.py` viết và sửa bài |
 | Guardrail | `app/guardrails/` | Luật cứng bằng code (`rules.py`) + LLM judge (`judge.py`) đối chiếu KB |
 | LLM | `app/llm/` | Gọi Claude, prompt, ghi chi phí |
 | Telegram | `app/telegram/` | `bot.py` (API, long-polling), `review.py` (định dạng tin duyệt), `handler.py` (nút bấm, Reply góp ý) |

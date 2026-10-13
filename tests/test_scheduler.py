@@ -75,7 +75,7 @@ def make_deps(
     def image(plan: ImagePlan, dest_dir: Path, settings: Settings) -> ImageResult:
         calls.images += 1
         assert dest_dir == Path(settings.DATA_DIR) / "media"
-        return ImageResult(paths=[str((dest_dir / "m.jpg").resolve())], note="Ảnh kho Pexels")
+        return ImageResult(paths=[str((dest_dir / "m.jpg").resolve())], note="Ảnh: Jane / Unsplash")
 
     settings = Settings(  # type: ignore[call-arg]
         _env_file=None,
@@ -135,7 +135,7 @@ def test_0800_drafts_morning_and_sends_for_review(
     assert post.source_text == ARTICLE.text and post.research_url == ARTICLE.url
     assert post.image_paths == [str((dirs / "data" / "media" / "m.jpg").resolve())]
     assert Path(post.image_paths[0]).is_absolute()
-    assert post.image_note == "Ảnh kho Pexels"
+    assert post.image_note == "Ảnh: Jane / Unsplash"
     item = db.scalar(select(ResearchItem).where(ResearchItem.url == ARTICLE.url))
     assert item is not None and item.used_post_id == post.id
     assert [s["method"] for s in bot.sent] == ["send_photos", "send_message"]

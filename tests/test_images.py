@@ -10,34 +10,63 @@ from app.content import images
 from app.content.images import ImagePlan, ImageResult
 
 PLAN = ImagePlan(kind="stock", stock_query="concrete roof", ai_prompt="generic roof")
-IMG_URL = "https://images.pexels.com/photos/1/large2x.jpg"
+SEARCH_URL = "https://api.unsplash.com/search/photos"
+IMG_URL = "https://images.unsplash.com/photo-1?ixid=abc&w=1080"
+DL_URL = "https://api.unsplash.com/photos/abc/download?ixid=abc"
 
 
 def _settings(**kw: str) -> Settings:
     return Settings(_env_file=None, **kw)  # type: ignore[call-arg]
 
 
+def _hit() -> dict[str, object]:
+    return {
+        "user": {"name": "Jane Doe"},
+        "urls": {"regular": IMG_URL},
+        "links": {"download_location": DL_URL},
+    }
+
+
 @respx.mock
 def test_stock_downloads_first_photo(tmp_path: Path) -> None:
-    search = respx.get("https://api.pexels.com/v1/search").mock(
-        return_value=httpx.Response(
-            200,
-            json={"photos": [{"photographer": "Jane", "src": {"large2x": IMG_URL}}]},
-        )
+    search = respx.get(SEARCH_URL).mock(
+        return_value=httpx.Response(200, json={"results": [_hit()]})
     )
     respx.get(IMG_URL).mock(return_value=httpx.Response(200, content=b"JPEGDATA"))
+    track = respx.get(DL_URL).mock(return_value=httpx.Response(200, json={"url": IMG_URL}))
     dest = tmp_path / "media"
-    res = images.fetch_stock("concrete roof", dest, _settings(PEXELS_API_KEY="k123"))
+    res = images.fetch_stock("concrete roof", dest, _settings(UNSPLASH_ACCESS_KEY="k123"))
     assert res is not None
-    assert "Jane" in res.note and res.note.startswith("Ảnh: Pexels")
+    assert res.note == "Ảnh: Jane Doe / Unsplash"
     p = Path(res.paths[0])
     assert p.is_absolute() and p.read_bytes() == b"JPEGDATA"
-    assert search.calls[0].request.headers["Authorization"] == "k123"
+    req = search.calls[0].request
+    assert req.headers["Authorization"] == "Client-ID k123"
+    assert req.url.params["query"] == "concrete roof"
+    assert req.url.params["orientation"] == "landscape"
+    # Unsplash API guidelines: trigger the download endpoint when a photo is used.
+    assert track.called
+    assert track.calls[0].request.headers["Authorization"] == "Client-ID k123"
+
+
+@respx.mock
+def test_stock_still_returns_photo_when_download_tracking_fails(tmp_path: Path) -> None:
+    respx.get(SEARCH_URL).mock(return_value=httpx.Response(200, json={"results": [_hit()]}))
+    respx.get(IMG_URL).mock(return_value=httpx.Response(200, content=b"JPEGDATA"))
+    respx.get(DL_URL).mock(return_value=httpx.Response(500))
+    res = images.fetch_stock("x", tmp_path, _settings(UNSPLASH_ACCESS_KEY="k"))
+    assert res is not None and res.paths
+
+
+@respx.mock
+def test_stock_none_when_no_results(tmp_path: Path) -> None:
+    respx.get(SEARCH_URL).mock(return_value=httpx.Response(200, json={"results": []}))
+    assert images.fetch_stock("x", tmp_path, _settings(UNSPLASH_ACCESS_KEY="k")) is None
 
 
 @respx.mock
 def test_stock_none_without_key(tmp_path: Path) -> None:
-    route = respx.get("https://api.pexels.com/v1/search")
+    route = respx.get(SEARCH_URL)
     assert images.fetch_stock("x", tmp_path, _settings()) is None
     assert not route.called
 
@@ -46,8 +75,8 @@ def test_stock_none_without_key(tmp_path: Path) -> None:
 def test_stock_none_on_http_error_and_no_key_leak(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    respx.get("https://api.pexels.com/v1/search").mock(return_value=httpx.Response(401))
-    assert images.fetch_stock("x", tmp_path, _settings(PEXELS_API_KEY="secretkey")) is None
+    respx.get(SEARCH_URL).mock(return_value=httpx.Response(401))
+    assert images.fetch_stock("x", tmp_path, _settings(UNSPLASH_ACCESS_KEY="secretkey")) is None
     assert "secretkey" not in caplog.text
 
 

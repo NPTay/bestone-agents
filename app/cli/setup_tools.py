@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = REPO_ROOT / ".env"
 TOKEN_KEY = "META_PAGE_ACCESS_TOKEN"
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
-PEXELS_SEARCH = "https://api.pexels.com/v1/search"
+UNSPLASH_SEARCH = "https://api.unsplash.com/search/photos"
 TEST_MESSAGE = "Kiểm tra kết nối OK"
 OK, FAIL = "✅", "❌"
 
@@ -215,14 +215,17 @@ def _check_meta(s: Settings) -> str:
     return f"Trang: {name}"
 
 
-def _check_pexels(s: Settings) -> str:
-    if not s.PEXELS_API_KEY:
-        raise SetupError("chưa có PEXELS_API_KEY (không bắt buộc)")
+def _check_unsplash(s: Settings) -> str:
+    if not s.UNSPLASH_ACCESS_KEY:
+        raise SetupError("chưa có UNSPLASH_ACCESS_KEY (không bắt buộc)")
     try:
         resp = httpx.get(
-            PEXELS_SEARCH,
+            UNSPLASH_SEARCH,
             params={"query": "construction", "per_page": 1},
-            headers={"Authorization": s.PEXELS_API_KEY},
+            headers={
+                "Authorization": f"Client-ID {s.UNSPLASH_ACCESS_KEY}",
+                "Accept-Version": "v1",
+            },
             timeout=30,
         )
     except httpx.HTTPError as exc:
@@ -276,7 +279,7 @@ def check(settings: Settings, anthropic_client: Any | None = None) -> int:
         ("Anthropic (AI viết bài)", lambda s: _check_anthropic(s, anthropic_client), True),
         ("Telegram", _check_telegram, True),
         ("Meta (Trang Facebook)", _check_meta, not settings.DRY_RUN),
-        ("Pexels (ảnh bản quyền)", _check_pexels, False),
+        ("Unsplash (ảnh bản quyền)", _check_unsplash, False),
         ("Gemini (ảnh AI)", _check_gemini, False),
         ("Thư mục Picture", _check_pictures, False),
         ("Thư mục Tai Lieu", _check_docs, False),

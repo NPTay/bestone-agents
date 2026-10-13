@@ -38,7 +38,7 @@ def _settings(**kw: object) -> Settings:
         "META_PAGE_ID": "",
         "META_PAGE_ACCESS_TOKEN": "",
         "META_GRAPH_VERSION": "v26.0",
-        "PEXELS_API_KEY": "",
+        "UNSPLASH_ACCESS_KEY": "",
         "GEMINI_API_KEY": "",
     }
     base.update(kw)

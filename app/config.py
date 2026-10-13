@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     TELEGRAM_ADMIN_CHAT_ID: str = ""
 
     # Images
-    PEXELS_API_KEY: str = ""
+    UNSPLASH_ACCESS_KEY: str = ""
     GEMINI_API_KEY: str = ""
     GEMINI_IMAGE_MODEL: str = "gemini-3.1-flash-image"
 

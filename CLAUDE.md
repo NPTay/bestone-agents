@@ -27,7 +27,7 @@ Bối cảnh: doanh nghiệp B2B siêu tinh gọn, một người dùng duy nh�
 6. **Tuân thủ Meta:** Chỉ dùng API chính thức. Không scrape Facebook. Tôn trọng cửa sổ nhắn tin 24 giờ (Đợt 2).
 7. **Ngôn ngữ:** Giao diện, prompt, bài đăng, tin Telegram: tiếng Việt. Mã nguồn, tên biến, comment: tiếng Anh.
 8. **Kiểm thử trước khi bàn giao:** Test chạy được, không bao giờ gọi mạng thật (dùng respx và FakeLLM/FakeTelegram), không đọc `.env` thật.
-9. **Ảnh:** Bài sáng chỉ dùng ảnh Pexels hoặc minh họa Gemini, không dùng ảnh từ bài báo; ảnh Gemini không được giả làm công trình hay kết quả thí nghiệm thật. Bài chiều chỉ dùng ảnh trong `Picture/` trừ `config/picture_exclude.txt`. `Picture/` và `Tai Lieu/` là thư viện của Giám đốc, đã gitignore, không sửa, không commit.
+9. **Ảnh:** Bài sáng chỉ dùng ảnh Unsplash hoặc minh họa Gemini, không dùng ảnh từ bài báo; ảnh Gemini không được giả làm công trình hay kết quả thí nghiệm thật. Bài chiều chỉ dùng ảnh trong `Picture/` trừ `config/picture_exclude.txt`. `Picture/` và `Tai Lieu/` là thư viện của Giám đốc, đã gitignore, không sửa, không commit.
 
 ## Lệnh thường dùng
 Dev local (Windows, thư mục gốc repo; PowerShell dùng `\`, Git Bash dùng `/`):
