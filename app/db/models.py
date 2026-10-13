@@ -47,6 +47,8 @@ class Alert(TimestampMixin, Base):
     channel: Mapped[str] = mapped_column(String(50))
     message: Mapped[str] = mapped_column(Text)
     delivered_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Last Telegram delivery attempt (redelivery waits REDELIVER_GAP between tries).
+    last_attempt_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
 
 class LlmUsage(TimestampMixin, Base):

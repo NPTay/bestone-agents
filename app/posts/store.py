@@ -2,13 +2,14 @@
 
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import clock
 from app.db.models import Post
 from app.guardrails.judge import GuardrailReport
 from app.schedule_times import DAY_END, Slot, local_now, publish_at
@@ -74,31 +75,63 @@ def new_revision(
     db.commit()
 
 
+def _in_day_window(day: date, now: datetime) -> bool:
+    """True while `day` is local today and the day has not ended (DAY_END)."""
+    local = local_now(now)
+    return day == local.date() and local.time() < DAY_END
+
+
+def _transition(db: Session, post_id: uuid.UUID, revision: int, **values: object) -> bool:
+    """Atomically move a pending post at `revision` to new values; False if it changed."""
+    result = db.execute(
+        update(Post)
+        .where(Post.id == post_id, Post.status == "pending", Post.revision == revision)
+        .values(updated_at=clock.utcnow(), **values)
+        .execution_options(synchronize_session=False)
+    )
+    db.commit()
+    return bool(cast(CursorResult[Any], result).rowcount == 1)
+
+
+def _reload(db: Session, post_id: uuid.UUID) -> None:
+    post = db.get(Post, post_id)
+    if post is not None:
+        db.refresh(post)
+
+
 def approve(
     db: Session, post_id: uuid.UUID, revision: int, now: datetime
 ) -> Literal["ok", "stale", "blocked"]:
     post = db.get(Post, post_id)
     if post is None or post.status != "pending" or post.revision != revision:
         return "stale"
+    if not _in_day_window(post.day, now):
+        return "stale"  # the day is over: the post expires, it is never published
     if post.blocking:
         return "blocked"
-    post.status = "approved"
-    post.approved_at = now
-    db.commit()
-    return "ok"
+    # Conditional UPDATE: a concurrent expiry (tick thread) or new revision wins.
+    ok = _transition(db, post_id, revision, status="approved", approved_at=now)
+    _reload(db, post_id)
+    return "ok" if ok else "stale"
 
 
 def reject(db: Session, post_id: uuid.UUID, revision: int) -> Literal["ok", "stale"]:
     post = db.get(Post, post_id)
     if post is None or post.status != "pending" or post.revision != revision:
         return "stale"
-    post.status = "rejected"
-    db.commit()
-    return "ok"
+    ok = _transition(db, post_id, revision, status="rejected")
+    _reload(db, post_id)
+    return "ok" if ok else "stale"
 
 
 def due_for_publish(db: Session, now: datetime) -> list[Post]:
-    approved = db.scalars(select(Post).where(Post.status == "approved")).all()
+    """Approved posts of local today whose slot time has passed, until DAY_END."""
+    local = local_now(now)
+    if local.time() >= DAY_END:
+        return []
+    approved = db.scalars(
+        select(Post).where(Post.status == "approved", Post.day == local.date())
+    ).all()
     return [p for p in approved if publish_at(p.day, p.slot) <= now]  # type: ignore[arg-type]
 
 

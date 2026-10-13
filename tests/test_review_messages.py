@@ -65,8 +65,25 @@ def test_send_for_review_normal_buttons_and_photos() -> None:
     assert bot.sent[1]["buttons"] == [("✅ Đăng", "ok:7:2"), ("❌ Không đăng", "no:7:2")]
 
 
-def test_format_review_truncates_to_4000() -> None:
+def test_format_review_truncates_long_body() -> None:
     text = format_review(_post(body="x" * 6000, guardrail_report={"flags": ["f"]}))
-    assert len(text) <= 4000
+    assert len(text.encode("utf-16-le")) // 2 <= 4096
     assert "…" in text
     assert "⚠️ Cần xem: f" in text and text.endswith("gõ góp ý.")
+
+
+def _utf16(text: str) -> int:
+    return len(text.encode("utf-16-le")) // 2
+
+
+def test_format_review_caps_emoji_body_at_4096_utf16_units() -> None:
+    text = format_review(_post(body="🧱" * 4000, guardrail_report={"flags": ["f"]}))
+    assert _utf16(text) <= 4096
+    assert "…" in text and "⚠️ Cần xem: f" in text and text.endswith("gõ góp ý.")
+
+
+def test_format_review_hard_truncates_when_header_alone_is_too_long() -> None:
+    text = format_review(_post(title="😀" * 5000, body="b"))
+    assert 4000 <= _utf16(text) <= 4096
+    assert text.endswith("…")
+    text.encode("utf-8")  # no split surrogate pair

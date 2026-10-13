@@ -9,7 +9,8 @@ from app.telegram.bot import TelegramError
 
 logger = logging.getLogger(__name__)
 
-MAX_LEN = 4000
+# Telegram's limit is 4096 characters counted in UTF-16 code units.
+MAX_UTF16 = 4096
 SLOT_LABEL = {"morning": "SÁNG", "afternoon": "CHIỀU"}
 SLOT_TIME = {"morning": "09:00", "afternoon": "16:30"}
 FOOTER = "💬 Muốn sửa: trả lời (reply) tin nhắn này và gõ góp ý."
@@ -49,13 +50,30 @@ def _compose(post: Post, body: str) -> str:
     return text + "\n\n" + FOOTER
 
 
+def _utf16_len(text: str) -> int:
+    return len(text.encode("utf-16-le")) // 2
+
+
+def _cut(text: str, limit: int) -> str:
+    """Longest prefix of `text` within `limit` UTF-16 units (never splits a character)."""
+    used = 0
+    for i, ch in enumerate(text):
+        used += 2 if ord(ch) > 0xFFFF else 1
+        if used > limit:
+            return text[:i]
+    return text
+
+
 def format_review(post: Post) -> str:
-    body = post.body
-    overflow = len(_compose(post, body)) - MAX_LEN
-    if overflow > 0:
-        keep = max(len(body) - overflow - 1, 0)
-        body = body[:keep] + "…"
-    return _compose(post, body)
+    """Review text capped at MAX_UTF16: trim the body first, hard-cut as a last resort."""
+    text = _compose(post, post.body)
+    overflow = _utf16_len(text) - MAX_UTF16
+    if overflow <= 0:
+        return text
+    body_room = _utf16_len(post.body) - overflow - 1  # 1 unit for "…"
+    if body_room >= 0:
+        return _compose(post, _cut(post.body, body_room) + "…")
+    return _cut(_compose(post, "…"), MAX_UTF16 - 1) + "…"
 
 
 def _buttons(post: Post) -> list[tuple[str, str]]:
@@ -65,11 +83,16 @@ def _buttons(post: Post) -> list[tuple[str, str]]:
     return buttons
 
 
+def send_review_text(bot: _Bot, post: Post) -> int:
+    """Send only the review text with the current-revision buttons (no photos)."""
+    return bot.send_message(format_review(post), buttons=_buttons(post))
+
+
 def send_for_review(bot: _Bot, post: Post) -> int:
     """Send photos (if any) then the review text with approve/reject buttons."""
     if post.image_paths:
         bot.send_photos(list(post.image_paths))
-    return bot.send_message(format_review(post), buttons=_buttons(post))
+    return send_review_text(bot, post)
 
 
 def send_for_review_safe(
@@ -77,13 +100,10 @@ def send_for_review_safe(
     post: Post,
     db: Session,
     alert_text: str | None = None,
-    *,
-    alert: bool = True,
 ) -> int | None:
     """Send for review; retry once, then fall back to plain text, then alert.
 
     Returns the Telegram message id, or None when nothing could be sent.
-    ``alert=False`` only logs the failure (used by periodic resends).
     """
     for _ in range(2):
         try:
@@ -91,11 +111,9 @@ def send_for_review_safe(
         except (TelegramError, OSError) as exc:
             logger.warning("Sending post for review failed: %s", type(exc).__name__)
     try:
-        return bot.send_message(format_review(post), buttons=_buttons(post))
+        return send_review_text(bot, post)
     except (TelegramError, OSError) as exc:
         logger.warning("Plain-text review fallback failed: %s", type(exc).__name__)
-    if not alert:
-        return None
     slot = "sáng" if post.slot == "morning" else "chiều"
     send_alert(db, "warn", alert_text or f"Không gửi được bài {slot} lên Telegram.")
     return None

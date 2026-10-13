@@ -1,4 +1,5 @@
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -106,3 +107,48 @@ def test_posts_for_day(db: Session) -> None:
     pending(db, D, "afternoon")
     pending(db, D + timedelta(days=1))
     assert {p.slot for p in store.posts_for_day(db, D)} == {"morning", "afternoon"}
+
+
+# --- day window and approve/expire race (final review, Important 1) ---------------
+
+
+def test_due_for_publish_ignores_other_days_and_after_day_end(db: Session) -> None:
+    today = pending(db)
+    assert store.approve(db, today.id, 1, local(D, 8, 0)) == "ok"
+    assert store.due_for_publish(db, local(D, 19, 59)) == [today]
+    assert store.due_for_publish(db, local(D, 20, 0)) == []
+    # Expiry failed overnight: yesterday's approved row must never be returned.
+    assert store.due_for_publish(db, local(D + timedelta(days=1), 10, 0)) == []
+
+
+def test_approve_after_day_end_is_stale(db: Session) -> None:
+    post = pending(db)
+    assert store.approve(db, post.id, 1, local(D, 20, 0)) == "stale"
+    assert post.status == "pending" and post.approved_at is None
+
+
+def test_approve_post_of_another_day_is_stale(db: Session) -> None:
+    post = pending(db, D - timedelta(days=1))
+    assert store.approve(db, post.id, 1, local(D, 8, 30)) == "stale"
+    assert post.status == "pending"
+
+
+def test_approve_after_concurrent_expire_is_stale(db: Session, db_factory: Any) -> None:
+    post = pending(db)
+    assert post.status == "pending"  # the Telegram thread's session has read `pending`
+    with db_factory() as tick_db:  # meanwhile the tick expires it and tells the director
+        assert [p.id for p, _prev in store.expire_open(tick_db, local(D, 20, 0))] == [post.id]
+    just_before = local(D, 19, 59) + timedelta(seconds=59)
+    assert store.approve(db, post.id, 1, just_before) == "stale"
+    db.expire_all()
+    assert db.get(Post, post.id).status == "expired"  # type: ignore[union-attr]
+    assert store.due_for_publish(db, local(D, 20, 0) + timedelta(seconds=30)) == []
+
+
+def test_reject_after_concurrent_expire_is_stale(db: Session, db_factory: Any) -> None:
+    post = pending(db)
+    with db_factory() as tick_db:
+        store.expire_open(tick_db, local(D, 20, 0))
+    assert store.reject(db, post.id, 1) == "stale"
+    db.expire_all()
+    assert db.get(Post, post.id).status == "expired"  # type: ignore[union-attr]

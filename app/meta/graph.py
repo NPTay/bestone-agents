@@ -9,6 +9,11 @@ import httpx
 
 from app.config import Settings
 
+# The request never left the PC (no connection was made): safe to retry later.
+NOT_SENT = -2
+# Any other transport failure: the request may have reached Facebook.
+UNKNOWN = -1
+
 
 class GraphError(Exception):
     """Graph API failure. The message never contains the access token."""
@@ -17,6 +22,12 @@ class GraphError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+def _transport_error(exc: httpx.HTTPError) -> GraphError:
+    """Map an httpx failure to a GraphError (type name only: messages can embed the URL)."""
+    code = NOT_SENT if isinstance(exc, httpx.ConnectError | httpx.ConnectTimeout) else UNKNOWN
+    return GraphError(code, type(exc).__name__)
 
 
 class GraphClient:
@@ -44,8 +55,7 @@ class GraphClient:
             else:
                 resp = self._client.post(url, data=form)
         except httpx.HTTPError as exc:
-            # Only the type name: httpx messages can embed the URL.
-            raise GraphError(-1, type(exc).__name__) from None
+            raise _transport_error(exc) from None
         try:
             body = resp.json()
         except ValueError:

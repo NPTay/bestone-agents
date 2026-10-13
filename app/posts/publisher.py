@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.content.pictures import record_use
 from app.db.models import Post
 from app.integrations.notify import send_alert
-from app.meta.graph import GraphClient, GraphError
+from app.meta.graph import NOT_SENT, UNKNOWN, GraphClient, GraphError
 from app.schedule_times import local_now
 from app.telegram.bot import TelegramError
 
@@ -65,11 +65,16 @@ def _relative_picture_paths(post: Post) -> list[str]:
 
 
 def _record_picture_use(db: Session, post: Post, now: datetime) -> None:
+    """Best effort: the post is already published, so a failure here is only logged."""
     if post.slot != "afternoon":
         return
-    paths = _relative_picture_paths(post)
-    if paths:
-        record_use(db, paths, now)
+    try:
+        paths = _relative_picture_paths(post)
+        if paths:
+            record_use(db, paths, now)
+    except Exception as exc:
+        db.rollback()
+        logger.error("Recording picture use failed: %s", type(exc).__name__)
 
 
 def _fail(db: Session, post: Post, error: str) -> None:
@@ -115,10 +120,18 @@ def publish_post(
     try:
         fb_post_id = graph.publish(compose_message(post), list(post.image_paths))
     except GraphError as exc:
+        if exc.code == NOT_SENT:
+            # Nothing reached Facebook: back to `approved` so the next tick retries
+            # (until DAY_END, when the post expires with a notice). No alert.
+            post.status = "approved"
+            post.error = exc.message
+            db.commit()
+            logger.warning("Post not sent (%s); will retry next tick", exc.message)
+            return
         _fail(db, post, exc.message)
         if exc.code == 190:
             send_alert(db, "urgent", TOKEN_EXPIRED_TEXT)
-        elif exc.code == -1:
+        elif exc.code == UNKNOWN:
             # Transport failure: the request may have reached Facebook.
             send_alert(
                 db,
@@ -138,6 +151,7 @@ def publish_post(
     post.status = "published"
     post.published_at = now
     post.fb_post_id = fb_post_id
+    post.error = None  # clear a transient NOT_SENT note
     db.commit()
     _record_picture_use(db, post, now)
     _try_comment(db, graph, post)

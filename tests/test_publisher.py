@@ -8,7 +8,8 @@ from sqlalchemy import orm
 
 from app.config import Settings, get_settings
 from app.db.models import Alert, PictureUse, Post
-from app.meta.graph import GraphClient, GraphError
+from app.meta.graph import NOT_SENT, GraphClient, GraphError
+from app.posts import publisher
 from app.posts.publisher import (
     COMMENT_TEXT,
     compose_message,
@@ -258,3 +259,42 @@ def test_telegram_failure_does_not_undo_publish(db: orm.Session, exc: Exception)
     post = make_post(db)
     publish_post(db, FakeGraph(), Broken(), post, NOW, dry_run=False)
     assert post.status == "published" and post.fb_post_id == "1_100"
+
+
+def test_not_sent_puts_post_back_to_approved_without_alert(
+    db: orm.Session, caplog: pytest.LogCaptureFixture
+) -> None:
+    post = make_post(db, "morning")
+    graph, bot = FakeGraph(), FakeTelegram()
+    graph.publish_error = GraphError(NOT_SENT, "ConnectError")
+    publish_post(db, graph, bot, post, NOW, dry_run=False)
+    db.refresh(post)
+    assert post.status == "approved" and post.fb_post_id is None
+    assert db.query(Alert).count() == 0 and bot.sent == []
+    assert "will retry" in caplog.text
+    graph.publish_error = None
+    publish_post(db, graph, bot, post, NOW, dry_run=False)
+    assert post.status == "published" and post.fb_post_id == "1_100"
+    assert post.error is None
+
+
+def test_picture_use_failure_does_not_break_publish(
+    db: orm.Session, env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    img = env / "1.jpg"
+    img.write_bytes(b"x")
+
+    def broken(*_a: object) -> None:
+        raise RuntimeError("db locked")
+
+    monkeypatch.setattr(publisher, "record_use", broken)
+    post = make_post(db, images=[str(img)])
+    graph, bot = FakeGraph(), FakeTelegram()
+    publish_post(db, graph, bot, post, NOW, dry_run=False)
+    assert post.status == "published" and post.comment_id == "c_1"
+    assert bot.sent[-1]["text"] == "✅ Đã đăng bài chiều."
+    assert db.query(Alert).count() == 0
+    post2 = make_post(db, images=[str(img)], day=date(2026, 10, 14))
+    publish_post(db, None, bot, post2, NOW, dry_run=True)
+    assert post2.status == "published"
+    assert bot.sent[-1]["text"] == "🧪 (Chạy thử) Đã giả lập đăng bài chiều."

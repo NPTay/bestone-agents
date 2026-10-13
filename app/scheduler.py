@@ -19,7 +19,7 @@ from app.content.research import Article, find_candidates, load_queries
 from app.content.writer import MorningDraft, review, write_afternoon, write_morning
 from app.db.models import Post, ResearchItem, Setting
 from app.guardrails.judge import GuardrailReport
-from app.integrations.notify import send_alert
+from app.integrations.notify import redeliver_alerts, send_alert
 from app.jobs import run_job
 from app.llm.client import LLMClient
 from app.llm.prompts import PROJECT_ROOT, load_knowledge
@@ -35,7 +35,7 @@ from app.schedule_times import (
     local_now,
 )
 from app.telegram.bot import FakeTelegram, TelegramBot, TelegramError
-from app.telegram.review import send_for_review_safe
+from app.telegram.review import send_for_review_safe, send_review_text
 
 logger = logging.getLogger(__name__)
 
@@ -362,7 +362,10 @@ def _draft_afternoon(deps: Deps, day: date, now: datetime, post_id: uuid.UUID) -
 def _expiry_text(post: Post, previous: str) -> str:
     label = f"Bài {SLOT_VI[post.slot]} {post.day:%d/%m}"
     if previous == "approved":
-        return f"⏰ {label} đã được duyệt nhưng máy tắt nên không đăng được trong ngày, đã bỏ."
+        return (
+            f"⏰ {label} đã được duyệt nhưng không đăng được trong ngày "
+            "(máy tắt hoặc mất mạng), đã bỏ."
+        )
     if post.telegram_message_id is None:
         return f"⏰ {label} chưa gửi được lên Telegram nên đã bỏ."
     return f"⏰ {label} chưa được duyệt trước 20:00 nên đã bỏ."
@@ -414,11 +417,15 @@ def _resend_unsent(deps: Deps, now: datetime) -> None:
             )
         ).all()
         for post in unsent:
-            # alert=False: the first send already alerted; don't repeat every minute.
-            message_id = send_for_review_safe(deps.bot, post, db, alert=False)
-            if message_id is not None:
-                post.telegram_message_id = message_id
-                db.commit()
+            # Text only, one try per tick and no alert: the first send already sent
+            # the photos (or tried to) and alerted; repeating photos every minute spams.
+            try:
+                message_id = send_review_text(deps.bot, post)
+            except (TelegramError, OSError) as exc:
+                logger.warning("Resending review text failed: %s", type(exc).__name__)
+                continue
+            post.telegram_message_id = message_id
+            db.commit()
 
 
 def _publish_due(deps: Deps, now: datetime) -> None:
@@ -437,6 +444,11 @@ def _publish_due(deps: Deps, now: datetime) -> None:
 def _retry_comments(deps: Deps, now: datetime) -> None:
     with deps.db_factory() as db:
         retry_missing_comments(db, deps.graph, now)
+
+
+def _redeliver_alerts(deps: Deps, now: datetime) -> None:
+    with deps.db_factory() as db:
+        redeliver_alerts(db, now)
 
 
 def _step(deps: Deps, name: str, fn: Callable[[], None]) -> None:
@@ -465,6 +477,7 @@ def tick(deps: Deps, now: datetime) -> None:
         _step(deps, "draft_afternoon", lambda: draft_afternoon(deps, today, now))
     _step(deps, "publish", lambda: _publish_due(deps, now))
     _step(deps, "comments", lambda: _retry_comments(deps, now))
+    _step(deps, "redeliver_alerts", lambda: _redeliver_alerts(deps, now))
 
 
 def _recover_drafting(deps: Deps, now: datetime) -> None:

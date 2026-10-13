@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from app.config import Settings
-from app.meta.graph import GraphClient, GraphError
+from app.meta.graph import NOT_SENT, GraphClient, GraphError
 
 BASE = "https://graph.facebook.com/v26.0"
 TOKEN = "SECRET_TOKEN_XYZ"
@@ -94,7 +94,7 @@ def test_graph_error_hides_token(graph: GraphClient, respx_mock) -> None:  # typ
 
 
 def test_network_and_non_json_errors(graph: GraphClient, respx_mock) -> None:  # type: ignore[no-untyped-def]
-    respx_mock.post(f"{BASE}/123/feed").mock(side_effect=httpx.ConnectError(f"boom {TOKEN}"))
+    respx_mock.post(f"{BASE}/123/feed").mock(side_effect=httpx.ReadTimeout(f"boom {TOKEN}"))
     with pytest.raises(GraphError) as info:
         graph.publish("x", [])
     assert info.value.code == -1 and TOKEN not in info.value.message
@@ -102,3 +102,30 @@ def test_network_and_non_json_errors(graph: GraphClient, respx_mock) -> None:  #
     with pytest.raises(GraphError) as info2:
         graph.publish("x", [])
     assert info2.value.code == -1 and "502" in info2.value.message
+
+
+@pytest.mark.parametrize("exc", [httpx.ConnectError("x"), httpx.ConnectTimeout("x")])
+def test_connect_failure_means_not_sent(
+    graph: GraphClient,
+    respx_mock,  # type: ignore[no-untyped-def]
+    exc: Exception,
+) -> None:
+    respx_mock.post(f"{BASE}/123/feed").mock(side_effect=exc)
+    with pytest.raises(GraphError) as info:
+        graph.publish("hi", [])
+    assert info.value.code == NOT_SENT == -2
+    assert TOKEN not in info.value.message
+
+
+@pytest.mark.parametrize(
+    "exc", [httpx.ReadTimeout("x"), httpx.WriteError("x"), httpx.RemoteProtocolError("x")]
+)
+def test_ambiguous_transport_failure_stays_minus_one(
+    graph: GraphClient,
+    respx_mock,  # type: ignore[no-untyped-def]
+    exc: Exception,
+) -> None:
+    respx_mock.post(f"{BASE}/123/feed").mock(side_effect=exc)
+    with pytest.raises(GraphError) as info:
+        graph.publish("hi", [])
+    assert info.value.code == -1

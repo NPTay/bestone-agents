@@ -1,9 +1,16 @@
 from collections.abc import Iterator
 from functools import lru_cache
+from typing import Any
 
-from sqlalchemy import Engine, StaticPool, create_engine, orm
+from sqlalchemy import Engine, StaticPool, create_engine, event, orm
 
 from app.config import get_settings
+
+
+def _sqlite_wal(dbapi_connection: Any, _record: Any) -> None:
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.close()
 
 
 def make_engine(url: str) -> Engine:
@@ -13,7 +20,10 @@ def make_engine(url: str) -> Engine:
             return create_engine(
                 url, connect_args={"check_same_thread": False}, poolclass=StaticPool
             )
-        return create_engine(url, connect_args={"check_same_thread": False})
+        # File DB shared by the tick and Telegram threads: wait for locks, use WAL.
+        engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 30})
+        event.listen(engine, "connect", _sqlite_wal)
+        return engine
     return create_engine(url, pool_pre_ping=True)
 
 

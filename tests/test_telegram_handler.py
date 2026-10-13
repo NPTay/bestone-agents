@@ -289,3 +289,12 @@ def test_revision_send_total_failure_alerts(db: Session) -> None:
         "Không gửi được bản sửa lên Telegram. Hãy gõ lại góp ý để thử lại."
     ]
     assert post.telegram_message_id == 50
+
+
+def test_approve_after_day_end_before_next_tick_is_stale(db: Session) -> None:
+    post = make_pending(db)
+    bot = FakeTelegram()
+    handle_update(db, bot, None, button(post, "ok"), local(D, 20, 0), ADMIN)
+    assert texts(bot, "answer_callback") == [handler.TXT_STALE]
+    assert post.status == "pending"
+    assert not any(s["method"] == "edit_buttons_removed" for s in bot.sent)
