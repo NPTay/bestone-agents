@@ -129,3 +129,22 @@ def test_ambiguous_transport_failure_stays_minus_one(
     with pytest.raises(GraphError) as info:
         graph.publish("hi", [])
     assert info.value.code == -1
+
+
+def test_token_owner_id_reads_me_with_header(graph: GraphClient, respx_mock) -> None:  # type: ignore[no-untyped-def]
+    route = respx_mock.get(url__regex=r"https://graph\.facebook\.com/v26\.0/me.*").respond(
+        200, json={"id": "999"}
+    )
+    assert graph.token_owner_id() == "999"
+    req = route.calls.last.request
+    assert TOKEN not in str(req.url)
+    assert req.headers["Authorization"] == f"Bearer {TOKEN}"
+
+
+def test_token_owner_id_error_hides_token(graph: GraphClient, respx_mock) -> None:  # type: ignore[no-untyped-def]
+    respx_mock.get(url__regex=r"https://graph\.facebook\.com/v26\.0/me.*").respond(
+        400, json={"error": {"code": 190, "message": f"bad {TOKEN}"}}
+    )
+    with pytest.raises(GraphError) as info:
+        graph.token_owner_id()
+    assert TOKEN not in info.value.message

@@ -104,19 +104,26 @@ class GraphClient:
         return _require_id(body, "id")
 
     def page_name(self) -> str:
+        return self._get_field(self._page_id, "name")
+
+    def token_owner_id(self) -> str:
+        """Id of whoever owns the token: the Page id for a Page token, a person's id otherwise."""
+        return self._get_field("me", "id")
+
+    def _get_field(self, path: str, field: str) -> str:
         # GET: the token goes in a header so it never appears in the URL.
-        url = f"{self._base}/{self._page_id}"
+        url = f"{self._base}/{path}"
         try:
-            resp = self._client.get(url, params={"fields": "name"}, headers=self._auth_header())
+            resp = self._client.get(url, params={"fields": field}, headers=self._auth_header())
             body = resp.json()
         except httpx.HTTPError as exc:
             raise GraphError(-1, type(exc).__name__) from None
         except ValueError:
             raise GraphError(-1, "Invalid response") from None
         self._raise_if_error(body)
-        if resp.status_code >= 400 or not isinstance(body, dict) or "name" not in body:
+        if resp.status_code >= 400 or not isinstance(body, dict) or field not in body:
             raise GraphError(-1, f"HTTP {resp.status_code}") from None
-        return str(body["name"])
+        return str(body[field])
 
     def _auth_header(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"}

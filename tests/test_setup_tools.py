@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+import respx
 
 from app.cli.setup_tools import check, meta_token, write_env_value
 from app.config import Settings
@@ -236,3 +237,31 @@ def test_check_gemini_ok_makes_one_tiny_image_call(monkeypatch: pytest.MonkeyPat
     )
     assert "gemini-x-image" in out
     assert len(calls) == 1 and calls[0]["model"] == "gemini-x-image"
+
+
+def _meta_settings() -> Settings:
+    return _settings(
+        META_PAGE_ID="123", META_PAGE_ACCESS_TOKEN="TOK_SECRET", META_GRAPH_VERSION="v26.0"
+    )
+
+
+@respx.mock
+def test_check_meta_rejects_user_token() -> None:
+    from app.cli import setup_tools
+
+    respx.get(url__regex=rf"{GRAPH}/123\b.*").respond(200, json={"name": "Bestone", "id": "123"})
+    respx.get(url__regex=rf"{GRAPH}/me\b.*").respond(200, json={"id": "555"})  # a person
+    with pytest.raises(setup_tools.SetupError) as err:
+        setup_tools._check_meta(_meta_settings())
+    msg = str(err.value)
+    assert "cá nhân" in msg and "meta-token" in msg
+    assert "TOK_SECRET" not in msg
+
+
+@respx.mock
+def test_check_meta_accepts_page_token() -> None:
+    from app.cli import setup_tools
+
+    respx.get(url__regex=rf"{GRAPH}/123\b.*").respond(200, json={"name": "Bestone", "id": "123"})
+    respx.get(url__regex=rf"{GRAPH}/me\b.*").respond(200, json={"id": "123"})  # the Page
+    assert "Bestone" in setup_tools._check_meta(_meta_settings())

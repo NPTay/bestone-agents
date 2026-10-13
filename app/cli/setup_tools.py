@@ -209,10 +209,19 @@ def _check_meta(s: Settings) -> str:
         raise SetupError("chưa có META_PAGE_ID hoặc META_PAGE_ACCESS_TOKEN")
     with httpx.Client(timeout=30) as client:
         try:
-            name = GraphClient(s, client=client).page_name()
+            graph = GraphClient(s, client=client)
+            name = graph.page_name()
+            owner = graph.token_owner_id()
         except GraphError as exc:
             raise SetupError(exc.message) from None  # GraphError scrubs the token
-    return f"Trang: {name}"
+    if owner != s.META_PAGE_ID:
+        # A personal (user) token can read the Page but Facebook rejects photo posts (#200).
+        raise SetupError(
+            f"Trang: {name}, nhưng token đang là token tài khoản cá nhân, không phải token "
+            "của Trang — Facebook sẽ từ chối đăng bài có ảnh. Chạy lại bước meta-token "
+            "(mục 7 trong hướng dẫn) để lấy token của Trang."
+        )
+    return f"Trang: {name} (token của Trang)"
 
 
 def _check_unsplash(s: Settings) -> str:

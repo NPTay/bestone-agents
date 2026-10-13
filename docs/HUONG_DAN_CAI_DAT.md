@@ -75,6 +75,7 @@ Bạn cần là **quản trị viên** của Fanpage.
    .venv\Scripts\python -m app.cli.setup_tools meta-token --user-token <dán token ngắn hạn>
    ```
    Thấy dòng `Đã lưu token cho Trang: <tên Trang>` là xong. Lệnh này không in token ra màn hình.
+   **Đừng dán token từ Graph API Explorer thẳng vào `.env`**: đó là token cá nhân, đọc được tên Trang nhưng Facebook từ chối đăng bài có ảnh (lỗi #200). Lệnh `check` sẽ báo ❌ nếu token chưa phải token của Trang.
 
 Đăng bài lên Fanpage do chính bạn quản trị chạy được khi App còn ở chế độ Development, không cần Meta duyệt App.
 
