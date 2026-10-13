@@ -232,3 +232,60 @@ def test_poll_once_returns_on_telegram_error(db_factory: Callable[[], Session]) 
     poll_once(db_factory, Broken(), None, settings(), lambda: NOW)
     with db_factory() as db:
         assert get_offset(db) == 0
+
+
+class FlakyTelegram(FakeTelegram):
+    """Fails the first `fail_review` sends of review messages (those carrying buttons)."""
+
+    def __init__(self, fail_review: int, fail_plain: bool = False) -> None:
+        super().__init__()
+        self.fail_review = fail_review
+        self.fail_plain = fail_plain
+        self.plain_attempts = 0
+
+    def send_message(
+        self,
+        text: str,
+        buttons: list[tuple[str, str]] | None = None,
+        reply_to: int | None = None,
+    ) -> int:
+        if buttons:
+            if self.fail_review > 0:
+                self.fail_review -= 1
+                raise TelegramError("sendMessage failed")
+            if self.fail_plain:
+                self.plain_attempts += 1
+                raise TelegramError("sendMessage failed")
+        return super().send_message(text, buttons, reply_to)
+
+
+def test_revision_send_retries_once(db: Session) -> None:
+    post = make_pending(db)
+    llm = FakeLLM({"content": [_draft(title="Mới")], "guardrail_judge": [_verdict()]})
+    bot = FlakyTelegram(fail_review=1)
+    handle_update(db, bot, llm, text("sửa", reply_to=50), NOW, ADMIN)
+    last = [s for s in bot.sent if s["method"] == "send_message"][-1]
+    assert last["buttons"][0][1] == f"ok:{post.id}:2"
+    assert post.telegram_message_id == last["message_id"]
+
+
+def test_revision_send_falls_back_to_plain_text_with_current_revision(db: Session) -> None:
+    post = make_pending(db)
+    llm = FakeLLM({"content": [_draft(title="Mới")], "guardrail_judge": [_verdict()]})
+    bot = FlakyTelegram(fail_review=2)
+    handle_update(db, bot, llm, text("sửa", reply_to=50), NOW, ADMIN)
+    last = [s for s in bot.sent if s["method"] == "send_message"][-1]
+    assert last["buttons"][0][1] == f"ok:{post.id}:{post.revision}" and post.revision == 2
+    assert post.telegram_message_id == last["message_id"]
+
+
+def test_revision_send_total_failure_alerts(db: Session) -> None:
+    post = make_pending(db)
+    llm = FakeLLM({"content": [_draft(title="Mới")], "guardrail_judge": [_verdict()]})
+    bot = FlakyTelegram(fail_review=0, fail_plain=True)
+    handle_update(db, bot, llm, text("sửa", reply_to=50), NOW, ADMIN)
+    alerts = [a.message for a in db.scalars(select(Alert))]
+    assert alerts == [
+        "Không gửi được bản sửa lên Telegram. Hãy gõ lại góp ý để thử lại."
+    ]
+    assert post.telegram_message_id == 50
