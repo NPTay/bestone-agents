@@ -1,8 +1,21 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Enum, Float, ForeignKey, Integer, Numeric, String, Text, Uuid
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, JSONType, TimestampMixin, UTCDateTime
@@ -53,3 +66,64 @@ class Setting(TimestampMixin, Base):
 
     key: Mapped[str] = mapped_column(String(100), unique=True)
     value: Mapped[str] = mapped_column(Text)
+
+
+class Post(TimestampMixin, Base):
+    __tablename__ = "posts"
+    __table_args__ = (UniqueConstraint("day", "slot", name="uq_posts_day_slot"),)
+
+    day: Mapped[date] = mapped_column(Date)
+    slot: Mapped[str] = mapped_column(_enum("post_slot", "morning", "afternoon"))
+    status: Mapped[str] = mapped_column(
+        _enum(
+            "post_status",
+            "drafting",
+            "pending",
+            "approved",
+            "publishing",
+            "published",
+            "rejected",
+            "expired",
+            "failed",
+        ),
+        default="drafting",
+    )
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    title: Mapped[str] = mapped_column(Text, default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    hashtags: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    cta: Mapped[str] = mapped_column(Text, default="")
+    sources: Mapped[list[dict[str, str]]] = mapped_column(JSONType, default=list)
+    kb_refs: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    # Absolute paths (controller ruling R1).
+    image_paths: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    image_note: Mapped[str | None] = mapped_column(Text)
+    picture_folder: Mapped[str | None] = mapped_column(String(500))
+    research_url: Mapped[str | None] = mapped_column(Text)
+    guardrail_report: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
+    blocking: Mapped[bool] = mapped_column(Boolean, default=False)
+    telegram_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    fb_post_id: Mapped[str | None] = mapped_column(String(100))
+    comment_id: Mapped[str | None] = mapped_column(String(100))
+    error: Mapped[str | None] = mapped_column(Text)
+
+
+class ResearchItem(TimestampMixin, Base):
+    __tablename__ = "research_items"
+
+    url: Mapped[str] = mapped_column(String(1000), unique=True)
+    title: Mapped[str] = mapped_column(Text)
+    source_name: Mapped[str] = mapped_column(String(200))
+    used_post_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("posts.id"))
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime)
+
+
+class PictureUse(TimestampMixin, Base):
+    __tablename__ = "picture_uses"
+
+    # Relative to PICTURE_DIR, forward slashes.
+    path: Mapped[str] = mapped_column(String(1000), unique=True)
+    used_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_used_at: Mapped[datetime | None] = mapped_column(UTCDateTime)

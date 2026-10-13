@@ -26,5 +26,13 @@ def test_init_db_creates_tables_and_dirs(tmp_path: Path, monkeypatch: pytest.Mon
         get_settings.cache_clear()
 
 
-def test_only_core_tables_defined() -> None:
-    assert set(Base.metadata.tables) == {"jobs", "alerts", "llm_usage", "settings"}
+def test_only_expected_tables_defined() -> None:
+    assert set(Base.metadata.tables) == {
+        "jobs",
+        "alerts",
+        "llm_usage",
+        "settings",
+        "posts",
+        "research_items",
+        "picture_uses",
+    }
