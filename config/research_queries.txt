@@ -1,0 +1,12 @@
+# One Vietnamese search query per line. Blank lines and lines starting with # are ignored.
+tin tức hầm chui
+tin tức hầm đường bộ
+tin tức metro
+tin tức trung tâm dữ liệu
+tin tức bãi đỗ xe ngầm
+tin tức chống thấm bê tông
+thấm dột tầng hầm
+tin tức cống hộp
+tin tức nhà máy điện
+tin tức ESG xây dựng
+tiêu chuẩn chống thấm
