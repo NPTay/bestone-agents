@@ -20,7 +20,7 @@ from app.posts import store
 from app.posts.store import PostDraft
 from app.schedule_times import LOCAL_TZ, local_now, publish_at
 from app.telegram.bot import TelegramError
-from app.telegram.review import format_review, send_for_review
+from app.telegram.review import send_for_review_safe
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ TXT_REJECTED = "Đã bỏ bài này."
 TXT_REVISING = "Đang sửa theo góp ý…"
 TXT_NO_LLM = "AI chưa được cấu hình nên chưa sửa được bài."
 TXT_LLM_FAILED = "Sửa bài bị lỗi, anh/chị thử gõ lại góp ý sau ít phút."
+TXT_SEND_FAILED = "Không gửi được bản sửa lên Telegram. Hãy gõ lại góp ý để thử lại."
 
 
 class _Bot(Protocol):
@@ -175,30 +176,13 @@ def _handle_text(
         return
     old_message_id = post.telegram_message_id
     store.new_revision(db, post, draft, report, blocking)
-    new_message_id = _send_revision(db, bot, post)
+    new_message_id = send_for_review_safe(bot, post, db, TXT_SEND_FAILED)
     if new_message_id is None:
         return
     post.telegram_message_id = new_message_id
     db.commit()
     if old_message_id is not None:
         bot.edit_buttons_removed(old_message_id)
-
-
-def _send_revision(db: Session, bot: _Bot, post: Post) -> int | None:
-    """Send the new revision; retry once, then fall back to plain text, then alert."""
-    for _ in range(2):
-        try:
-            return send_for_review(bot, post)
-        except (TelegramError, OSError):
-            continue
-    buttons = [("❌ Không đăng", f"no:{post.id}:{post.revision}")]
-    if not post.blocking:
-        buttons.insert(0, ("✅ Đăng", f"ok:{post.id}:{post.revision}"))
-    try:
-        return bot.send_message(format_review(post), buttons=buttons)
-    except TelegramError:
-        send_alert(db, "warn", "Không gửi được bản sửa lên Telegram. Hãy gõ lại góp ý để thử lại.")
-        return None
 
 
 def handle_update(

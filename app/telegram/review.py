@@ -1,6 +1,13 @@
+import logging
 from typing import Protocol
 
+from sqlalchemy.orm import Session
+
 from app.db.models import Post
+from app.integrations.notify import send_alert
+from app.telegram.bot import TelegramError
+
+logger = logging.getLogger(__name__)
 
 MAX_LEN = 4000
 SLOT_LABEL = {"morning": "SÁNG", "afternoon": "CHIỀU"}
@@ -51,11 +58,36 @@ def format_review(post: Post) -> str:
     return _compose(post, body)
 
 
+def _buttons(post: Post) -> list[tuple[str, str]]:
+    buttons = [("❌ Không đăng", f"no:{post.id}:{post.revision}")]
+    if not post.blocking:
+        buttons.insert(0, ("✅ Đăng", f"ok:{post.id}:{post.revision}"))
+    return buttons
+
+
 def send_for_review(bot: _Bot, post: Post) -> int:
     """Send photos (if any) then the review text with approve/reject buttons."""
     if post.image_paths:
         bot.send_photos(list(post.image_paths))
-    buttons = [("❌ Không đăng", f"no:{post.id}:{post.revision}")]
-    if not post.blocking:
-        buttons.insert(0, ("✅ Đăng", f"ok:{post.id}:{post.revision}"))
-    return bot.send_message(format_review(post), buttons=buttons)
+    return bot.send_message(format_review(post), buttons=_buttons(post))
+
+
+def send_for_review_safe(
+    bot: _Bot, post: Post, db: Session, alert_text: str | None = None
+) -> int | None:
+    """Send for review; retry once, then fall back to plain text, then alert.
+
+    Returns the Telegram message id, or None when nothing could be sent.
+    """
+    for _ in range(2):
+        try:
+            return send_for_review(bot, post)
+        except (TelegramError, OSError) as exc:
+            logger.warning("Sending post for review failed: %s", type(exc).__name__)
+    try:
+        return bot.send_message(format_review(post), buttons=_buttons(post))
+    except (TelegramError, OSError) as exc:
+        logger.warning("Plain-text review fallback failed: %s", type(exc).__name__)
+    slot = "sáng" if post.slot == "morning" else "chiều"
+    send_alert(db, "warn", alert_text or f"Không gửi được bài {slot} lên Telegram.")
+    return None
