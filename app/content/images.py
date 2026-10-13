@@ -104,17 +104,18 @@ def generate_ai(prompt: str, dest_dir: Path, settings: Settings) -> ImageResult 
 
 def get_morning_image(plan: ImagePlan, dest_dir: Path, settings: Settings) -> ImageResult:
     """Try the planned source first, then the other. Never raises."""
-    try:
-        attempts: list[Callable[[], ImageResult | None]] = [
-            lambda: fetch_stock(plan.stock_query, dest_dir, settings),
-            lambda: generate_ai(plan.ai_prompt, dest_dir, settings),
-        ]
-        if plan.kind == "ai":
-            attempts.reverse()
-        for attempt in attempts:
+    attempts: list[Callable[[], ImageResult | None]] = [
+        lambda: fetch_stock(plan.stock_query, dest_dir, settings),
+        lambda: generate_ai(plan.ai_prompt, dest_dir, settings),
+    ]
+    if plan.kind == "ai":
+        attempts.reverse()
+    for attempt in attempts:
+        try:
             result = attempt()
-            if result is not None:
-                return result
-    except Exception as exc:  # noqa: BLE001
-        _log_failure("morning image", exc)
+        except Exception as exc:  # noqa: BLE001 - try the other source
+            _log_failure("morning image", exc)
+            continue
+        if result is not None:
+            return result
     return ImageResult(paths=[], note=NO_IMAGE_NOTE)
