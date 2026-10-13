@@ -105,6 +105,10 @@ class TelegramBot:
             },
         )
 
+    def get_me(self) -> dict[str, Any]:
+        result = self._call("getMe")
+        return dict(result) if isinstance(result, dict) else {}
+
     def get_updates(self, offset: int, timeout: int = 30) -> list[dict[str, Any]]:
         result = self._call(
             "getUpdates",
