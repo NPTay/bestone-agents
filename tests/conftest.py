@@ -5,9 +5,18 @@ import pytest
 from sqlalchemy import Engine, orm
 
 from app import clock
+from app.config import Settings
 from app.db import models  # noqa: F401
 from app.db.base import Base
 from app.db.session import make_engine
+
+
+@pytest.fixture(autouse=True)
+def _isolate_settings_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep OS environment variables (real keys, model names) out of every test's Settings."""
+    for name in Settings.model_fields:
+        monkeypatch.delenv(name, raising=False)
+        monkeypatch.delenv(name.lower(), raising=False)
 
 
 @pytest.fixture

@@ -5,6 +5,7 @@ import os
 import sys
 import threading
 import time
+import traceback
 import webbrowser
 from collections.abc import Callable
 from logging.handlers import RotatingFileHandler
@@ -186,6 +187,12 @@ def run(settings: Settings, open_browser: bool = True) -> int:
             return 0
         try:
             return _serve(settings, open_browser)
+        except Exception as exc:
+            # Log before the file handler goes: under pythonw stderr is None.
+            # Type and frames only; str(exc) may carry a secret (e.g. a DB URL).
+            frames = "".join(traceback.format_tb(exc.__traceback__))
+            logger.error("Run failed: %s\n%s", type(exc).__name__, frames)
+            return 1
         finally:
             lock.close()  # type: ignore[attr-defined]
     finally:

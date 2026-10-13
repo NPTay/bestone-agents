@@ -27,7 +27,22 @@ class FakeAnthropic:
 
 
 def _settings(**kw: object) -> Settings:
-    return Settings(_env_file=None, **kw)  # type: ignore[call-arg]
+    # Every key the checks read is explicit, so nothing depends on defaults or the OS env.
+    base: dict[str, object] = {
+        "ANTHROPIC_API_KEY": "",
+        "MODEL_FAST": "claude-haiku-5-5",
+        "TELEGRAM_BOT_TOKEN": "",
+        "TELEGRAM_ADMIN_CHAT_ID": "",
+        "META_APP_ID": "",
+        "META_APP_SECRET": "",
+        "META_PAGE_ID": "",
+        "META_PAGE_ACCESS_TOKEN": "",
+        "META_GRAPH_VERSION": "v26.0",
+        "PEXELS_API_KEY": "",
+        "GEMINI_API_KEY": "",
+    }
+    base.update(kw)
+    return Settings(_env_file=None, **base)  # type: ignore[call-arg]
 
 
 def test_meta_token_writes_env_and_prints_no_secret(

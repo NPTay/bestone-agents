@@ -44,3 +44,30 @@ def test_null_telegram_raises_telegram_error_without_network() -> None:
         bot.send_message("hi")
     with pytest.raises(TelegramError):
         bot.edit_buttons_removed(1)
+
+
+def test_run_logs_startup_crash_and_returns_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.runner as runner
+
+    password = "SECRET" + "PW"  # built at runtime: frames show source lines, not values
+
+    def boom(engine: object) -> None:
+        raise RuntimeError(f"postgresql://user:{password}@host/db")
+
+    monkeypatch.setattr(runner, "init_db", boom)
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None, DATA_DIR=str(tmp_path), DATABASE_URL="sqlite://"
+    )
+
+    assert run(settings, open_browser=False) == 1
+
+    log_text = (tmp_path / "logs" / "app.log").read_text(encoding="utf-8")
+    assert "RuntimeError" in log_text
+    assert "boom" in log_text  # traceback frames are logged
+    assert "SECRETPW" not in log_text
+    # the lock was released: a later start can take it
+    lock = acquire_single_instance(tmp_path / "bestone.lock")
+    assert lock is not None
+    lock.close()  # type: ignore[attr-defined]
