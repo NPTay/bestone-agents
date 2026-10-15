@@ -3,6 +3,7 @@
 import json
 import logging
 from typing import Any
+from urllib.parse import urlparse
 from uuid import UUID
 
 from app.config import get_settings
@@ -44,6 +45,18 @@ def _post_dict(draft: PostDraft) -> dict[str, Any]:
     return draft.model_dump(include=_POST_FIELDS)
 
 
+def _clean_sources(sources: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Keep only sources with a URL; the model sometimes returns {} or drops keys."""
+    out: list[dict[str, str]] = []
+    for s in sources:
+        url = str(s.get("url") or "").strip() if isinstance(s, dict) else ""
+        if not url or any(o["url"] == url for o in out):
+            continue
+        name = str(s.get("name") or "").strip() or (urlparse(url).hostname or url)
+        out.append({"name": name, "url": url})
+    return out
+
+
 def write_morning(
     llm: LLMClient,
     articles: list[Article],
@@ -79,7 +92,8 @@ def write_morning(
     if chosen is None:
         log.warning("Morning writer chose an article outside the candidate list")
         return None
-    if not any(s.get("url") == chosen.url for s in draft.sources):
+    draft.sources = _clean_sources(draft.sources)
+    if not any(s["url"] == chosen.url for s in draft.sources):
         draft.sources.append({"name": chosen.source_name, "url": chosen.url})
     return draft
 
@@ -145,7 +159,7 @@ def revise(
             DATA_HEADER + "\n" + json.dumps(data, ensure_ascii=False, indent=1),
         ]
     )
-    return llm.structured(
+    fixed = llm.structured(
         agent=WRITER_AGENT,
         model=get_settings().MODEL_QUALITY,
         system=_system(kb),
@@ -153,6 +167,13 @@ def revise(
         output_model=PostDraft,
         job_id=job_id,
     )
+    # Never lose a citation on revision: keep the old sources the model dropped or garbled.
+    sources = _clean_sources(fixed.sources)
+    for old in _clean_sources(previous.sources):
+        if not any(s["url"] == old["url"] for s in sources):
+            sources.append(old)
+    fixed.sources = sources
+    return fixed
 
 
 def _check(

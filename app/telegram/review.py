@@ -34,8 +34,10 @@ def _compose(post: Post, body: str) -> str:
     )
     parts = [header, post.title, body, f"{post.cta}\n{' '.join(post.hashtags or [])}"]
     tail: list[str] = []
-    if post.sources:
-        tail.append("Nguồn: " + "\n".join(f"{s['name']} – {s['url']}" for s in post.sources))
+    # Tolerate incomplete sources ({} seen live): a formatting crash blocks the review.
+    lines = [f"{s.get('name') or s['url']} – {s['url']}" for s in post.sources if s.get("url")]
+    if lines:
+        tail.append("Nguồn: " + "\n".join(lines))
     if post.image_note:
         tail.append(post.image_note)
     flags = (post.guardrail_report or {}).get("flags") or []

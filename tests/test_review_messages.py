@@ -89,3 +89,9 @@ def test_format_review_hard_truncates_when_header_alone_is_too_long() -> None:
     assert 4000 <= _utf16(text) <= 4096
     assert text.endswith("…")
     text.encode("utf-8")  # no split surrogate pair
+
+
+def test_format_review_tolerates_incomplete_sources() -> None:
+    text = format_review(_post(sources=[{}, {"url": "http://x.vn/2"}, {"name": "Báo Y"}]))
+    assert "http://x.vn/2" in text
+    assert "Nguồn: \n" not in text

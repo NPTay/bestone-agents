@@ -157,3 +157,39 @@ def test_review_fix_succeeds_not_blocking() -> None:
     report, blocking = review(llm, bad, KB, [], [], None)
     assert report["passed"] is True and blocking is False
     assert "Bảo hành" not in bad.body
+
+
+SRC = {"name": "baomoi.com", "url": "https://baomoi.com/ham-chui-t36668660.epi"}
+
+
+def test_revise_keeps_previous_source_when_model_returns_empty_dict() -> None:
+    # Seen live 15/10/2026: the auto-fix returned sources=[{}] and crashed the review send.
+    llm = FakeLLM({"content": [_draft(sources=[{}])]})
+    out = revise(llm, _draft(sources=[SRC]), "Sửa", KB, [], None)
+    assert out.sources == [SRC]
+
+
+def test_revise_keeps_previous_source_when_model_drops_it() -> None:
+    llm = FakeLLM({"content": [_draft(sources=[])]})
+    out = revise(llm, _draft(sources=[SRC]), "Sửa", KB, [], None)
+    assert out.sources == [SRC]
+
+
+def test_revise_drops_incomplete_sources_but_keeps_new_valid_ones() -> None:
+    new = {"name": "vnexpress.net", "url": "https://vnexpress.net/a"}
+    llm = FakeLLM({"content": [_draft(sources=[{"name": "x"}, new])]})
+    out = revise(llm, _draft(sources=[SRC]), "Sửa", KB, [], None)
+    assert out.sources == [new, SRC]
+
+
+def test_review_auto_fix_never_loses_the_article_source() -> None:
+    bad = _draft(body=_draft().body + " Bảo hành 10 năm.")
+    bad.sources = [SRC]
+    llm = FakeLLM(
+        {
+            "guardrail_judge": [_verdict(), _verdict()],
+            "content": [_draft(sources=[{}])],
+        }
+    )
+    review(llm, bad, KB, [], [], None)
+    assert bad.sources == [SRC]
