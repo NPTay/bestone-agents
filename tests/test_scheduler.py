@@ -705,3 +705,37 @@ def test_morning_post_approved_at_0815_is_published_at_once(
     tick(deps, local(D, 8, 15))  # well before the old 09:00 slot time
     [post] = posts(db)
     assert post.status == "published"
+
+
+def test_morning_research_is_limited_to_news_domains(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def research(
+        llm: Any, db: Session, queries: list[str], job_id: Any, **kw: Any
+    ) -> list[Article]:
+        seen.update(kw)
+        return []
+
+    deps = make_deps(db_factory, dirs, morning_llm(), FakeTelegram(), Calls())
+    deps.research_fn = research
+    tick(deps, local(D, 8, 0))
+    assert "vnexpress.net" in seen["domains"]
+
+
+def test_morning_research_asks_for_news_from_the_last_90_days(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def research(
+        llm: Any, db: Session, queries: list[str], job_id: Any, **kw: Any
+    ) -> list[Article]:
+        seen.update(kw)
+        return []
+
+    deps = make_deps(db_factory, dirs, morning_llm(), FakeTelegram(), Calls())
+    deps.research_fn = research
+    tick(deps, local(D, 8, 0))
+    assert seen["max_age_days"] == 90

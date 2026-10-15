@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.config import get_settings
-from app.guardrails.rules import RuleFinding, check_rules, extract_numbers
+from app.guardrails.rules import MAX_WORDS, MIN_WORDS, RuleFinding, check_rules, extract_numbers
 from app.llm.client import LLMClient, LLMError
 from app.llm.prompts import load_agent_prompt
 
@@ -65,6 +65,7 @@ def check_post(
     kb_text: str,
     source_texts: list[str],
     job_id: UUID | None,
+    word_range: tuple[int, int] = (MIN_WORDS, MAX_WORDS),
 ) -> GuardrailReport:
     """Run deterministic rules, then the LLM judge (skipped when ``llm`` is None)."""
     title = str(post.get("title", ""))
@@ -80,6 +81,7 @@ def check_post(
         source_texts=source_texts,
         sources=list(post.get("sources", [])),
         kb_refs=kb_refs,
+        word_range=word_range,
     )
     flags = [f.message for f in findings]
     verdict: JudgeVerdict | None = None

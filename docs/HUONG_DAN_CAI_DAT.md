@@ -117,7 +117,7 @@ Lệnh đọc các PDF trong `Tai Lieu` và tạo file `knowledge\catalogue_prop
 ## 13. Loại bớt ảnh không muốn đăng
 Mặc định mọi ảnh `.jpg/.jpeg/.png` trong `Picture` đều có thể được dùng (video bị bỏ qua). Để loại một thư mục hoặc một ảnh: mở `config\picture_exclude.txt`, thêm mỗi dòng một đường dẫn tính từ thư mục `Picture` (ví dụ `MAU SAN PHAM BESTONE`). Dòng bắt đầu bằng `#` là ghi chú. Khởi động lại chương trình sau khi sửa.
 
-Muốn đổi chủ đề tìm tin cho bài sáng: sửa `config\research_queries.txt` (mỗi dòng một cụm từ tìm kiếm).
+Muốn đổi chủ đề tìm tin cho bài sáng: sửa `config\research_queries.txt` (mỗi dòng một cụm từ tìm kiếm). Tin chỉ được tìm trên các báo trong `config\news_domains.txt` (mỗi dòng một tên miền, ví dụ `vnexpress.net`); thêm hoặc bớt báo ở đó. Chỉ lấy tin đăng trong 3 tháng gần đây (trang không ghi ngày đăng bị bỏ qua). Bài sáng được viết theo lối kể tin: mở bằng chi tiết đáng chú ý nhất, kể lại tin, một đoạn bài học kỹ thuật chung, rồi mới đến Bestone (180-320 từ).
 
 ## Dùng hằng ngày trên Telegram
 - Bot gửi bản nháp kèm nút **Đăng** / **Không đăng**. Bấm nút để duyệt hoặc bỏ.

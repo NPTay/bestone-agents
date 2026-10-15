@@ -14,7 +14,7 @@ from app.telegram import handler
 from app.telegram.bot import FakeTelegram, TelegramError
 from app.telegram.handler import get_offset, handle_update, poll_once, set_offset
 from tests.test_post_store import REPORT, D, draft, local
-from tests.test_writer import _draft, _verdict
+from tests.test_writer import _draft, _long_body, _verdict
 
 ADMIN = "1"
 NOW = local(D, 8, 30)
@@ -150,7 +150,12 @@ def test_malformed_callback_data(db: Session) -> None:
 
 def test_feedback_reply_creates_new_revision_and_resends(db: Session) -> None:
     post = make_pending(db)
-    llm = FakeLLM({"content": [_draft(title="Bản mới")], "guardrail_judge": [_verdict()]})
+    llm = FakeLLM(
+        {
+            "content": [_draft(title="Bản mới", body=_long_body(220))],
+            "guardrail_judge": [_verdict()],
+        }
+    )
     bot = FakeTelegram()
     handle_update(db, bot, llm, text("Ngắn gọn hơn", reply_to=50), NOW, ADMIN)
     assert post.revision == 2 and post.status == "pending" and post.title == "Bản mới"
@@ -164,7 +169,9 @@ def test_feedback_reply_creates_new_revision_and_resends(db: Session) -> None:
 
 def test_single_pending_free_text_is_applied(db: Session) -> None:
     post = make_pending(db)
-    llm = FakeLLM({"content": [_draft(title="X")], "guardrail_judge": [_verdict()]})
+    llm = FakeLLM(
+        {"content": [_draft(title="X", body=_long_body(220))], "guardrail_judge": [_verdict()]}
+    )
     handle_update(db, FakeTelegram(), llm, text("đổi tiêu đề"), NOW, ADMIN)
     assert post.revision == 2
 
@@ -280,7 +287,9 @@ class FlakyTelegram(FakeTelegram):
 
 def test_revision_send_retries_once(db: Session) -> None:
     post = make_pending(db)
-    llm = FakeLLM({"content": [_draft(title="Mới")], "guardrail_judge": [_verdict()]})
+    llm = FakeLLM(
+        {"content": [_draft(title="Mới", body=_long_body(220))], "guardrail_judge": [_verdict()]}
+    )
     bot = FlakyTelegram(fail_review=1)
     handle_update(db, bot, llm, text("sửa", reply_to=50), NOW, ADMIN)
     last = [s for s in bot.sent if s["method"] == "send_message"][-1]
@@ -290,7 +299,9 @@ def test_revision_send_retries_once(db: Session) -> None:
 
 def test_revision_send_falls_back_to_plain_text_with_current_revision(db: Session) -> None:
     post = make_pending(db)
-    llm = FakeLLM({"content": [_draft(title="Mới")], "guardrail_judge": [_verdict()]})
+    llm = FakeLLM(
+        {"content": [_draft(title="Mới", body=_long_body(220))], "guardrail_judge": [_verdict()]}
+    )
     bot = FlakyTelegram(fail_review=2)
     handle_update(db, bot, llm, text("sửa", reply_to=50), NOW, ADMIN)
     last = [s for s in bot.sent if s["method"] == "send_message"][-1]
@@ -300,7 +311,9 @@ def test_revision_send_falls_back_to_plain_text_with_current_revision(db: Sessio
 
 def test_revision_send_total_failure_alerts(db: Session) -> None:
     post = make_pending(db)
-    llm = FakeLLM({"content": [_draft(title="Mới")], "guardrail_judge": [_verdict()]})
+    llm = FakeLLM(
+        {"content": [_draft(title="Mới", body=_long_body(220))], "guardrail_judge": [_verdict()]}
+    )
     bot = FlakyTelegram(fail_review=0, fail_plain=True)
     handle_update(db, bot, llm, text("sửa", reply_to=50), NOW, ADMIN)
     alerts = [a.message for a in db.scalars(select(Alert))]

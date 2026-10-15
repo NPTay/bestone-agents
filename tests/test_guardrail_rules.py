@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from app.guardrails.rules import check_rules, extract_numbers, kb_number_set
+from app.guardrails.rules import MORNING_WORDS, check_rules, extract_numbers, kb_number_set
 from app.llm.prompts import PROJECT_ROOT, load_knowledge
 
 KB = load_knowledge()["bestone_knowledge_base.md"]
@@ -282,3 +282,28 @@ def test_news_url_numeric_id_not_a_fact() -> None:
     f = check_rules(**{**SAMPLE, "body": SAMPLE["body"] + f" {url} Giảm 95% rò rỉ."})
     facts = [x for x in f if x.check == "facts"]
     assert len(facts) == 1 and "95" in facts[0].message
+
+
+def _words(n: int) -> str:
+    return " ".join(["chữ"] * n)
+
+
+def _format_findings(body: str, word_range: tuple[int, int] | None = None) -> list[str]:
+    s = _sample()
+    kwargs: dict[str, Any] = {} if word_range is None else {"word_range": word_range}
+    found = check_rules(
+        body=body, title="T", hashtags=s["hashtags"], cta=s["cta"], kb_text=KB,
+        source_texts=[], sources=[], kb_refs=["2"], **kwargs,
+    )
+    return [f.message for f in found if f.check == "format"]
+
+
+def test_default_word_range_is_afternoon_80_180() -> None:
+    assert _format_findings(_words(200))  # too long for an afternoon post
+
+
+def test_morning_word_range_allows_a_longer_news_lead() -> None:
+    assert MORNING_WORDS == (180, 320)
+    assert _format_findings(_words(250), MORNING_WORDS) == []
+    msgs = _format_findings(_words(150), MORNING_WORDS)
+    assert msgs and "180" in msgs[0] and "320" in msgs[0]

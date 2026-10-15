@@ -2,10 +2,12 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 import httpx
+import pytest
 import respx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.content import research
 from app.content.research import fetch_article, find_candidates, load_queries
 from app.db.models import ResearchItem
 from app.llm.client import FakeLLM, SearchHit
@@ -114,3 +116,83 @@ def test_load_queries_skips_blank_and_comments(tmp_path: Path) -> None:
     p = tmp_path / "q.txt"
     p.write_text("# c\n\n  hầm chui \nmetro\n", encoding="utf-8")
     assert load_queries(p) == ["hầm chui", "metro"]
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://baomoi.com/ham-chui-t36668660.epi",  # baomoi topic page (seen live 15/10)
+        "https://vnexpress.net/tag/chong-tham-123",
+        "https://baoxaydung.vn/chu-de/ham-chui",
+        "https://example.vn/tim-kiem?q=ham",
+    ],
+)
+@respx.mock  # any HTTP call would fail the test: listing pages must not be fetched
+def test_listing_and_topic_pages_are_skipped(url: str) -> None:
+    assert research.fetch_article(url) is None
+
+
+def test_regular_baomoi_article_url_is_not_treated_as_listing() -> None:
+    assert not research._is_listing("https://baomoi.com/ham-chui-an-phu-thong-xe-c50123456.epi")
+
+
+def test_find_candidates_passes_news_domains_to_search(db: Session) -> None:
+    llm = FakeLLM({}, hits=[])
+    find_candidates(llm, db, ["q1"], None, day=date(2026, 10, 15), domains=["vnexpress.net"])
+    assert all(c["allowed_domains"] == ["vnexpress.net"] for c in llm.calls)
+
+
+def test_news_domains_config_lists_major_vietnamese_papers() -> None:
+    root = Path(research.__file__).resolve().parents[2]
+    domains = load_queries(root / "config" / "news_domains.txt")
+    assert {"vnexpress.net", "tuoitre.vn", "baoxaydung.vn"} <= set(domains)
+
+
+def _dated_html(head: str) -> str:
+    return _html().replace("<head>", "<head>" + head)
+
+
+@respx.mock
+@pytest.mark.parametrize(
+    "head",
+    [
+        '<meta name="pubdate" content="2026-10-08T14:00:00+07:00">',  # VnExpress
+        '<meta property="article:published_time" content="2026-10-08T12:29:00">',  # Tuổi Trẻ
+        '<script type="application/ld+json">{"datePublished": "2026-10-08T16:30:14.000+07:00"}'
+        "</script>",  # VietNamNet
+    ],
+)
+def test_fetch_article_reads_publish_date(head: str) -> None:
+    page = httpx.Response(200, html=_dated_html(head))
+    respx.get("https://vnexpress.net/a").mock(return_value=page)
+    art = fetch_article("https://vnexpress.net/a")
+    assert art is not None and art.published == date(2026, 10, 8)
+
+
+@respx.mock
+def test_fetch_article_without_date_has_none() -> None:
+    respx.get("https://vnexpress.net/a").mock(return_value=_ok())
+    art = fetch_article("https://vnexpress.net/a")
+    assert art is not None and art.published is None
+
+
+@respx.mock
+def test_find_candidates_keeps_only_recent_dated_news(db: Session) -> None:
+    def page(day: str) -> httpx.Response:
+        return httpx.Response(
+            200, html=_dated_html(f'<meta name="pubdate" content="{day}T08:00:00+07:00">')
+        )
+
+    respx.get("https://news.test/recent").mock(return_value=page("2026-09-01"))
+    respx.get("https://news.test/old").mock(return_value=page("2026-06-01"))  # > 90 days
+    respx.get("https://news.test/undated").mock(return_value=_ok())
+    llm = FakeLLM(
+        {},
+        hits=[
+            SearchHit(url="https://news.test/old", title="o"),
+            SearchHit(url="https://news.test/undated", title="u"),
+            SearchHit(url="https://news.test/recent", title="r"),
+        ],
+    )
+    arts = find_candidates(llm, db, ["q"], None, day=date(2026, 10, 15), max_age_days=90)
+    assert [a.url for a in arts] == ["https://news.test/recent"]

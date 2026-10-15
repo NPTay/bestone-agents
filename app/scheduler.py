@@ -40,6 +40,9 @@ from app.telegram.review import send_for_review_safe, send_review_text
 logger = logging.getLogger(__name__)
 
 QUERIES_FILE = PROJECT_ROOT / "config" / "research_queries.txt"
+# Morning news comes only from these papers (otherwise search returns competitors' ads).
+NEWS_DOMAINS_FILE = PROJECT_ROOT / "config" / "news_domains.txt"
+NEWS_MAX_AGE_DAYS = 90  # director: only news from the last 1-3 months
 PICTURE_EXCLUDE_FILE = PROJECT_ROOT / "config" / "picture_exclude.txt"
 RECENT_DAYS = 14
 AGENT = "content"
@@ -249,16 +252,21 @@ def _draft_morning(deps: Deps, day: date, now: datetime, post_id: uuid.UUID) -> 
         return
     ctx = _load_context(deps, day)
     queries = load_queries(QUERIES_FILE)
+    domains = load_queries(NEWS_DOMAINS_FILE) if NEWS_DOMAINS_FILE.exists() else None
 
     def work(db: Session, job_id: uuid.UUID) -> _MorningResult:
-        articles = deps.research_fn(llm, db, queries, job_id, day=day)
+        articles = deps.research_fn(
+            llm, db, queries, job_id, day=day, domains=domains, max_age_days=NEWS_MAX_AGE_DAYS
+        )
         if not articles:
             return _MorningResult()
         draft = write_morning(llm, articles, ctx.kb, ctx.recent_titles, job_id)
         if draft is None:
             return _MorningResult()
         article = next(a for a in articles if a.url == draft.article_url)
-        report, blocking = review(llm, draft, ctx.kb, [article.text], ctx.unverified, job_id)
+        report, blocking = review(
+            llm, draft, ctx.kb, [article.text], ctx.unverified, job_id, slot="morning"
+        )
         media_dir = Path(deps.settings.DATA_DIR) / "media"
         image = deps.image_fn(draft.image_plan, media_dir, deps.settings)
         return _MorningResult(draft, article, report, blocking, image)
@@ -322,7 +330,9 @@ def _draft_afternoon(deps: Deps, day: date, now: datetime, post_id: uuid.UUID) -
     def work(db: Session, job_id: uuid.UUID) -> _AfternoonResult:
         choice = choose_pictures(db, picture_dir, PICTURE_EXCLUDE_FILE, ctx.kb)
         draft = write_afternoon(llm, choice, ctx.kb, ctx.recent_titles, job_id)
-        report, blocking = review(llm, draft, ctx.kb, [], ctx.unverified, job_id)
+        report, blocking = review(
+            llm, draft, ctx.kb, [], ctx.unverified, job_id, slot="afternoon"
+        )
         return _AfternoonResult(draft, report, blocking, choice)
 
     result = run_job(

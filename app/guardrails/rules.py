@@ -14,6 +14,8 @@ MANDATORY_HASHTAGS = ("#bestone", "#chongthambetong", "#cgengineeringvietnam")
 CTA_PHRASE = "nhắn tin để nhận tài liệu kỹ thuật"
 MIN_WORDS = 80
 MAX_WORDS = 180
+# Morning posts retell a news story before turning to Bestone, so they need more room.
+MORNING_WORDS = (180, 320)
 MAX_EMOJI = 2
 MIN_HASHTAGS = 3
 MAX_HASHTAGS = 5
@@ -171,15 +173,15 @@ def count_emoji(text: str) -> int:
     return len(_EMOJI_RE.findall(text))
 
 
-def _check_format(body: str, hashtags: list[str], cta: str) -> list[RuleFinding]:
+def _check_format(
+    body: str, hashtags: list[str], cta: str, word_range: tuple[int, int]
+) -> list[RuleFinding]:
     findings: list[RuleFinding] = []
     words = len(body.split())
-    if not MIN_WORDS <= words <= MAX_WORDS:
+    low, high = word_range
+    if not low <= words <= high:
         findings.append(
-            RuleFinding(
-                "format",
-                f"Thân bài có {words} từ, cần từ {MIN_WORDS} đến {MAX_WORDS} từ.",
-            )
+            RuleFinding("format", f"Thân bài có {words} từ, cần từ {low} đến {high} từ.")
         )
     emoji = count_emoji(body + " " + cta)
     if emoji > MAX_EMOJI:
@@ -231,13 +233,14 @@ def check_rules(
     source_texts: list[str],
     sources: list[dict[str, str]],
     kb_refs: list[str],
+    word_range: tuple[int, int] = (MIN_WORDS, MAX_WORDS),
 ) -> list[RuleFinding]:
     """Run every deterministic rule; an empty list means the post may proceed."""
     text = "\n".join([title, body, cta])
     return [
         *_check_facts(text, kb_text, source_texts),
         *_check_forbidden(text, hashtags),
-        *_check_format(body, hashtags, cta),
+        *_check_format(body, hashtags, cta, word_range),
         *_check_sources(sources, kb_refs),
     ]
 

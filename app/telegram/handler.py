@@ -18,7 +18,7 @@ from app.llm.client import LLMClient, LLMError
 from app.llm.prompts import load_knowledge
 from app.posts import store
 from app.posts.store import PostDraft
-from app.schedule_times import local_now
+from app.schedule_times import Slot, local_now
 from app.telegram.bot import TelegramError
 from app.telegram.review import send_for_review_safe
 
@@ -171,8 +171,9 @@ def _handle_text(
         kb_refs=post.kb_refs,
     )
     try:
-        draft = revise(llm, previous, text, kb, sources, None)
-        report, blocking = review(llm, draft, kb, sources, unverified, None)
+        slot: Slot = "morning" if post.slot == "morning" else "afternoon"
+        draft = revise(llm, previous, text, kb, sources, None, slot)
+        report, blocking = review(llm, draft, kb, sources, unverified, None, slot)
     except LLMError:
         bot.send_message(TXT_LLM_FAILED)
         return

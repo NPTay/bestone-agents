@@ -52,7 +52,8 @@ PLAN = ImagePlan(kind="stock", stock_query="concrete tunnel", ai_prompt="")
 
 
 def _morning(**over: Any) -> MorningDraft:
-    data = _draft().model_dump()
+    # Morning posts retell the news first, so their body uses the longer morning range.
+    data = _draft(body=_long_body(220)).model_dump()
     data.update(article_url=ARTICLE.url, image_plan=PLAN)
     data.update(over)
     return MorningDraft(**data)
@@ -193,3 +194,40 @@ def test_review_auto_fix_never_loses_the_article_source() -> None:
     )
     review(llm, bad, KB, [], [], None)
     assert bad.sources == [SRC]
+
+
+def _long_body(n: int) -> str:
+    base = _draft().body.split()
+    return " ".join((base * (n // len(base) + 1))[:n])
+
+
+def test_review_uses_morning_word_range_for_morning_posts() -> None:
+    long_draft = _draft(body=_long_body(250))
+    llm = FakeLLM({"guardrail_judge": [_verdict()]})
+    report, _ = review(llm, long_draft, KB, [], [], None, slot="morning")
+    assert not any("từ" in f and "Thân bài" in f for f in report["flags"])
+
+
+def test_review_keeps_short_range_for_afternoon_posts() -> None:
+    long_draft = _draft(body=_long_body(250))
+    llm = FakeLLM(
+        {"guardrail_judge": [_verdict(), _verdict()], "content": [_draft(body=_long_body(250))]}
+    )
+    report, _ = review(llm, long_draft, KB, [], [], None)
+    assert any("Thân bài" in f for f in report["flags"])
+
+
+def test_revise_tells_the_writer_which_slot_and_length() -> None:
+    llm = FakeLLM({"content": [_draft()]})
+    revise(llm, _draft(), "Sửa", KB, [], None, slot="morning")
+    user = llm.calls[-1]["user"]
+    assert "BÀI BUỔI SÁNG" in user and "180-320 từ" in user
+
+
+def test_writer_calls_leave_room_for_long_morning_posts() -> None:
+    # Live 15/10/2026: a 300-word morning post from 5 articles hit max_tokens=4000.
+    llm = FakeLLM({"content": [_morning(), _draft(), _draft()]})
+    write_morning(llm, [ARTICLE], KB, [], None)
+    revise(llm, _draft(), "Sửa", KB, [], None, slot="morning")
+    write_afternoon(llm, None, KB, [], None)
+    assert all(c["max_tokens"] >= 12000 for c in llm.calls)

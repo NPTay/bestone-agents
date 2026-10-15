@@ -27,7 +27,7 @@ def test_content_prompt_restates_format_rules() -> None:
         "#Bestone",
         "#ChongThamBeTong",
         "#CGEngineeringVietNam",
-        "80-180 từ",
+        "80-180 từ",  # afternoon
         "theo tài liệu của nhà sản xuất",
     ):
         assert phrase in prompt
@@ -63,3 +63,9 @@ def test_content_prompt_keeps_cta_and_link_out_of_body() -> None:
     assert "KHÔNG đặt link trong body" in prompt
     assert "Cuối body có lời kêu gọi" not in prompt
     assert "tên báo + link" not in prompt
+
+
+def test_morning_prompt_leads_with_the_news_before_bestone() -> None:
+    prompt = load_agent_prompt("content")
+    for phrase in ("180-320 từ", "Mở bài bằng chi tiết đắt giá nhất", "Kể lại tin", "Đoạn chuyển"):
+        assert phrase in prompt

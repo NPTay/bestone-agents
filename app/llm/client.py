@@ -21,6 +21,12 @@ T = TypeVar("T", bound=BaseModel)
 
 Reason = Literal["refusal", "max_tokens", "invalid_output", "api_error"]
 
+SEARCH_INSTRUCTION = (
+    "Hãy dùng công cụ web_search để tìm các bài báo tiếng Việt mới nhất (đăng trong 3 tháng "
+    "gần đây) về chủ đề sau. "
+    'Không trả lời từ kiến thức sẵn có; sau khi tìm xong chỉ trả lời "xong".\nChủ đề: '
+)
+
 
 class LLMError(Exception):
     """Raised when the model call cannot produce usable output."""
@@ -57,6 +63,7 @@ class LLMClient(Protocol):
         query: str,
         max_uses: int = 3,
         job_id: UUID | None = None,
+        allowed_domains: list[str] | None = None,
     ) -> list[SearchHit]: ...
 
 
@@ -85,6 +92,17 @@ def _record_usage(
             )
         )
         db.commit()
+
+
+def _search_tool(max_uses: int, allowed_domains: list[str] | None) -> dict[str, Any]:
+    tool: dict[str, Any] = {
+        "type": "web_search_20260209",
+        "name": "web_search",
+        "max_uses": max_uses,
+    }
+    if allowed_domains:
+        tool["allowed_domains"] = list(allowed_domains)
+    return tool
 
 
 class AnthropicLLM:
@@ -174,14 +192,16 @@ class AnthropicLLM:
         query: str,
         max_uses: int = 3,
         job_id: UUID | None = None,
+        allowed_domains: list[str] | None = None,
     ) -> list[SearchHit]:
         response = self._create(
             agent=agent,
             job_id=job_id,
             model=self._settings.MODEL_QUALITY,
             max_tokens=2000,
-            messages=[{"role": "user", "content": query}],
-            tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": max_uses}],
+            # A bare query lets the model answer from memory without searching (0 hits).
+            messages=[{"role": "user", "content": SEARCH_INSTRUCTION + query}],
+            tools=[_search_tool(max_uses, allowed_domains)],
         )
         if response.stop_reason == "refusal":
             raise LLMError("refusal")
@@ -246,6 +266,7 @@ class FakeLLM:
                 "user": user,
                 "output_model": output_model,
                 "effort": effort,
+                "max_tokens": max_tokens,
                 "job_id": job_id,
             }
         )
@@ -265,8 +286,17 @@ class FakeLLM:
         query: str,
         max_uses: int = 3,
         job_id: UUID | None = None,
+        allowed_domains: list[str] | None = None,
     ) -> list[SearchHit]:
-        self.calls.append({"agent": agent, "query": query, "max_uses": max_uses, "job_id": job_id})
+        self.calls.append(
+            {
+                "agent": agent,
+                "query": query,
+                "max_uses": max_uses,
+                "job_id": job_id,
+                "allowed_domains": allowed_domains,
+            }
+        )
         self._log(agent, "fake", job_id)
         return list(self.hits)
 

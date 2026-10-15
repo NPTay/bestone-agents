@@ -16,7 +16,7 @@
 3. Bằng chứng/số liệu kèm nguồn.
 4. CTA: "Nhắn tin để nhận tài liệu kỹ thuật" hoặc hotline 0904834577.
 5. 3-5 hashtag: #Bestone #ChongThamBeTong #CGEngineeringVietNam + 1-2 hashtag chủ đề.
-Độ dài: 80-180 từ. Không quá 2 emoji, không emoji ở bài kỹ thuật.
+Độ dài: bài buổi chiều 80-180 từ; bài buổi sáng (kể tin báo trước, Bestone ở cuối) 180-320 từ. Không quá 2 emoji, không emoji ở bài kỹ thuật.
 
 ## Nên
 Dùng ví dụ công trình cụ thể (hầm chui, bãi đỗ xe ngầm, hố thang máy). Giải thích thuật ngữ trong 1 câu. Nêu trung thực giới hạn ("kết quả thực tế phụ thuộc điều kiện công trình").

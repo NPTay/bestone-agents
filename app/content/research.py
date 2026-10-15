@@ -1,8 +1,9 @@
 """News research for the morning post: web search, dedupe, article fetching."""
 
 import logging
+import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 from uuid import UUID
@@ -35,6 +36,34 @@ class Article:
     title: str
     source_name: str
     text: str
+    published: date | None = None
+
+
+_DATE_META = ("article:published_time", "og:article:published_time", "pubdate", "datepublished")
+_LD_DATE = re.compile(r'"datePublished"\s*:\s*"(\d{4}-\d{2}-\d{2})')
+_ISO_DAY = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
+
+
+def _parse_day(value: str | None) -> date | None:
+    match = _ISO_DAY.match((value or "").strip())
+    if not match:
+        return None
+    try:
+        return date(int(match[1]), int(match[2]), int(match[3]))
+    except ValueError:
+        return None
+
+
+def _published_date(soup: BeautifulSoup, html: str) -> date | None:
+    """Publish date from meta tags (VnExpress, Tuổi Trẻ, CafeF...) or JSON-LD (VietNamNet)."""
+    for meta in soup.find_all("meta"):
+        key = str(meta.get("property") or meta.get("name") or meta.get("itemprop") or "")
+        if key.lower() in _DATE_META:
+            day = _parse_day(str(meta.get("content") or ""))
+            if day:
+                return day
+    match = _LD_DATE.search(html)
+    return _parse_day(match[1]) if match else None
 
 
 def load_queries(path: Path) -> list[str]:
@@ -57,9 +86,21 @@ def _is_blocked(url: str) -> bool:
     return any(host == d or host.endswith("." + d) for d in BLOCKED_DOMAINS)
 
 
+# Tag, topic and search pages mix many stories; a post retold from them is mush.
+_LISTING_PATH = re.compile(
+    r"/(tag|tags|chu-de|topic|topics|tim-kiem|search|category|danh-muc)(/|$)"
+    r"|-t\d+\.epi$",  # baomoi.com topic pages (articles end in -c<digits>.epi)
+    re.IGNORECASE,
+)
+
+
+def _is_listing(url: str) -> bool:
+    return bool(_LISTING_PATH.search(urlparse(url).path))
+
+
 def fetch_article(url: str) -> Article | None:
     """Download a page and extract its main text; None if unusable."""
-    if _is_blocked(url):
+    if _is_blocked(url) or _is_listing(url):
         return None
     try:
         resp = httpx.get(
@@ -76,6 +117,7 @@ def fetch_article(url: str) -> Article | None:
         return None
 
     soup = BeautifulSoup(resp.text, "html.parser")
+    published = _published_date(soup, resp.text)
     for tag in soup(["script", "style", "noscript"]):
         tag.decompose()
     root = soup.find("article") or soup.find("main") or soup.body or soup
@@ -89,7 +131,13 @@ def fetch_article(url: str) -> Article | None:
         title=title or url,
         source_name=_hostname(url),
         text=text[:MAX_TEXT_CHARS],
+        published=published,
     )
+
+
+def _is_recent(article: Article, day: date, max_age_days: int) -> bool:
+    """Undated pages are skipped too: an old story retold as news misleads readers."""
+    return article.published is not None and article.published >= day - timedelta(max_age_days)
 
 
 def find_candidates(
@@ -100,6 +148,8 @@ def find_candidates(
     *,
     day: date,
     limit: int = 5,
+    domains: list[str] | None = None,
+    max_age_days: int | None = None,
 ) -> list[Article]:
     """Search 3 rotating queries, fetch unseen articles, record them as ResearchItems."""
     if not queries:
@@ -112,7 +162,9 @@ def find_candidates(
     seen: set[str] = set()
     articles: list[Article] = []
     for query in picked:
-        hits = llm.web_search(agent="research", query=query, max_uses=3, job_id=job_id)
+        hits = llm.web_search(
+            agent="research", query=query, max_uses=3, job_id=job_id, allowed_domains=domains
+        )
         for hit in hits:
             if len(articles) >= limit:
                 return articles
@@ -121,6 +173,8 @@ def find_candidates(
             seen.add(hit.url)
             article = fetch_article(hit.url)
             if article is None:
+                continue
+            if max_age_days is not None and not _is_recent(article, day, max_age_days):
                 continue
             db.add(
                 ResearchItem(

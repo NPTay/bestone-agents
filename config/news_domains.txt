@@ -1,0 +1,21 @@
+# Báo điện tử được dùng để tìm tin cho bài buổi sáng (mỗi dòng một tên miền).
+# Thêm/bớt báo ở đây; dòng bắt đầu bằng # là ghi chú. Để trống cả file = tìm trên toàn web.
+vnexpress.net
+tuoitre.vn
+thanhnien.vn
+dantri.com.vn
+vietnamnet.vn
+laodong.vn
+nld.com.vn
+tienphong.vn
+znews.vn
+baoxaydung.vn
+cafef.vn
+baodautu.vn
+vneconomy.vn
+plo.vn
+sggp.org.vn
+hanoimoi.vn
+nhandan.vn
+qdnd.vn
+vtv.vn

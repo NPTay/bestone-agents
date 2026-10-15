@@ -14,7 +14,7 @@ QUY TẮC
   3. Sao chép nguyên câu từ tin nguồn; bài tin ngành thiếu dẫn nguồn (tên báo + link) (G3).
   4. Số liệu hoặc kết quả thí nghiệm của nhà sản xuất mà không có cụm "theo tài liệu của nhà sản xuất" hoặc nhãn nguồn tương đương; suy diễn kết quả nước ngoài thành cam kết cho công trình Việt Nam (G4).
   5. Công kích hoặc hạ thấp đối thủ, so sánh trực tiếp tên đối thủ.
-  6. Suy đoán nguyên nhân sự cố của công trình bên thứ ba.
+  6. Suy đoán nguyên nhân sự cố của công trình bên thứ ba. Bài tin ngành (bài sáng) ĐƯỢC kể lại tin và nêu tên dự án có trong tin nguồn; chỉ ghi lỗi khi bài gắn Bestone, chuyện thấm/nứt/chất lượng hoặc nguyên nhân sự cố với dự án đó mà tin nguồn không nói. Đoạn bài học kỹ thuật chung đã tách bạch rõ khỏi dự án (ví dụ "không riêng dự án này...") là hợp lệ.
   7. Nội dung chính trị, tôn giáo; thông tin cá nhân của khách hàng.
   8. Số liệu hoặc khẳng định kỹ thuật không có trong kho tri thức dù viết bằng lời.
 - tone_ok=false nếu giọng bài quảng cáo thổi phồng, cảm thán quá mức, hoặc không đúng giọng kỹ thuật, chừng mực, B2B.

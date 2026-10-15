@@ -247,3 +247,35 @@ def test_get_llm_none_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(get_llm(), AnthropicLLM)
     get_llm.cache_clear()
     get_settings.cache_clear()
+
+
+def test_web_search_explicitly_instructs_the_model_to_search(
+    db_factory: Callable[[], orm.Session],
+) -> None:
+    # Seen live 15/10/2026: a bare query made the model answer from memory (0 hits).
+    mock = Mock(_message([_search_result([])]))
+    mock.llm(db_factory).web_search(agent="research", query="thấm dột tầng hầm")
+    content = mock.bodies[0]["messages"][0]["content"]
+    assert "thấm dột tầng hầm" in content
+    assert "web_search" in content and "Không trả lời từ kiến thức" in content
+
+
+def test_web_search_restricts_to_allowed_domains(db_factory: Callable[[], orm.Session]) -> None:
+    mock = Mock(_message([_search_result([])]))
+    mock.llm(db_factory).web_search(
+        agent="research", query="q", allowed_domains=["vnexpress.net", "tuoitre.vn"]
+    )
+    [tool] = mock.bodies[0]["tools"]
+    assert tool["allowed_domains"] == ["vnexpress.net", "tuoitre.vn"]
+
+
+def test_web_search_without_domains_sends_no_filter(db_factory: Callable[[], orm.Session]) -> None:
+    mock = Mock(_message([_search_result([])]))
+    mock.llm(db_factory).web_search(agent="research", query="q")
+    assert "allowed_domains" not in mock.bodies[0]["tools"][0]
+
+
+def test_web_search_asks_for_recent_news(db_factory: Callable[[], orm.Session]) -> None:
+    mock = Mock(_message([_search_result([])]))
+    mock.llm(db_factory).web_search(agent="research", query="q")
+    assert "3 tháng gần đây" in mock.bodies[0]["messages"][0]["content"]
