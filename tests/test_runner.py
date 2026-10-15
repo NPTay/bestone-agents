@@ -71,3 +71,27 @@ def test_run_logs_startup_crash_and_returns_one(
     lock = acquire_single_instance(tmp_path / "bestone.lock")
     assert lock is not None
     lock.close()  # type: ignore[attr-defined]
+
+
+def test_tick_loop_runs_again_as_soon_as_woken() -> None:
+    import threading
+    import time
+
+    from app.runner import _tick_loop
+
+    stop, wake = threading.Event(), threading.Event()
+    runs: list[float] = []
+
+    def body() -> None:
+        runs.append(time.monotonic())
+        if len(runs) == 2:
+            stop.set()
+
+    t = threading.Thread(target=_tick_loop, args=(stop, wake, body, 60.0), daemon=True)
+    started = time.monotonic()
+    t.start()
+    time.sleep(0.2)
+    wake.set()  # e.g. the director just approved a post
+    t.join(timeout=5)
+    assert not t.is_alive()
+    assert len(runs) == 2 and runs[1] - started < 5  # did not wait the full 60 s

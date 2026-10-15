@@ -13,8 +13,8 @@ Bestone là sản phẩm B2B kỹ thuật, chu kỳ chốt dài. Fanpage là kê
 Chương trình chạy trên máy tính Windows của Giám đốc, một người dùng duy nhất. Mọi thứ đi ra ngoài đều được Giám đốc duyệt trên Telegram.
 
 **Đợt 1 (đã xây, chờ nghiệm thu với khóa thật)**
-- Bài sáng (đăng 09:00): tìm tin ngành, viết theo góc nhìn kỹ thuật Bestone, ảnh Unsplash hoặc minh họa Gemini.
-- Bài chiều (đăng 16:30): viết từ tài liệu trong `Tai Lieu` và kho tri thức, ảnh từ `Picture`; được nêu tên công trình khi KB mục 13 đã điền đủ.
+- Bài sáng (soạn 08:00, đăng ngay khi Giám đốc duyệt): tìm tin ngành, viết theo góc nhìn kỹ thuật Bestone, ảnh Unsplash hoặc minh họa Gemini.
+- Bài chiều (soạn 15:00, đăng ngay khi Giám đốc duyệt): viết từ tài liệu trong `Tai Lieu` và kho tri thức, ảnh từ `Picture`; được nêu tên công trình khi KB mục 13 đã điền đủ.
 - Duyệt bằng nút "Đăng" / "Không đăng" hoặc góp ý bằng cách Reply; AI sửa và gửi bản mới.
 - Bình luận giới thiệu cố định (Bestone, hotline, website) ngay sau khi đăng.
 - Trang "Hôm nay" chỉ xem; tự chạy khi Windows đăng nhập.

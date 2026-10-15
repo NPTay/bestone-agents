@@ -692,3 +692,16 @@ def test_tick_redelivers_undelivered_alert(
     db.expire_all()
     [alert] = db.scalars(select(Alert)).all()
     assert alert.delivered_at is not None and route.call_count == 1
+
+
+def test_morning_post_approved_at_0815_is_published_at_once(
+    db: Session, db_factory: SessionFactory, dirs: Path
+) -> None:
+    bot = FakeTelegram()
+    deps = make_deps(db_factory, dirs, morning_llm(), bot, Calls())
+    tick(deps, local(D, 8, 0))
+    [post] = posts(db)
+    assert store.approve(db, post.id, post.revision, local(D, 8, 15)) == "ok"
+    tick(deps, local(D, 8, 15))  # well before the old 09:00 slot time
+    [post] = posts(db)
+    assert post.status == "published"

@@ -20,11 +20,11 @@ from app.schedule_times import LOCAL_TZ, local_now
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 WEEKDAYS = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
-SLOTS = (("morning", "09:00", "Bài sáng"), ("afternoon", "16:30", "Bài chiều"))
+SLOTS = (("morning", "Soạn 08:00", "Bài sáng"), ("afternoon", "Soạn 15:00", "Bài chiều"))
 STATUS_LABELS = {
     "drafting": "Đang soạn…",
     "pending": "Chờ anh/chị duyệt trên Telegram ⏳",
-    "approved": "Đã duyệt – chờ đến giờ đăng",
+    "approved": "Đã duyệt – đang đăng lên Fanpage",
     "publishing": "Đang đăng…",
     "published": "Đã đăng ✓",
     "rejected": "Đã bỏ",

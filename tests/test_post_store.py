@@ -69,11 +69,11 @@ def test_reject_pending(db: Session) -> None:
     assert post.status == "rejected"
 
 
-def test_due_for_publish_respects_slot_time(db: Session) -> None:
+def test_due_for_publish_right_after_approval(db: Session) -> None:
+    # The director wants approved posts published immediately, not at the slot time.
     post = pending(db)
-    assert store.approve(db, post.id, 1, local(D, 8, 0)) == "ok"
-    assert store.due_for_publish(db, local(D, 8, 59)) == []
-    assert store.due_for_publish(db, local(D, 9, 0)) == [post]
+    assert store.approve(db, post.id, 1, local(D, 8, 15)) == "ok"
+    assert store.due_for_publish(db, local(D, 8, 15)) == [post]
 
 
 def test_expire_open_at_day_end(db: Session) -> None:

@@ -19,7 +19,7 @@ Một tiến trình Python duy nhất (`python -m app`, chạy ngầm bằng `py
 1. `tick` thấy đến giờ soạn (08:00 sáng, 15:00 chiều; bật máy muộn thì soạn ngay nếu còn trước 12:00 cho bài sáng) và chưa có bài trong ngày/khung đó.
 2. Writer viết theo `knowledge/`, guardrail kiểm tra, chọn ảnh, lưu `Post` trạng thái `pending`, gửi Telegram kèm nút "Đăng" / "Không đăng".
 3. Giám đốc bấm nút (`approved` hoặc `rejected`) hoặc Reply góp ý (tạo revision mới, nút cũ vô hiệu).
-4. Đã duyệt và đến giờ (09:00 / 16:30) thì `tick` chuyển `publishing`, đăng lên Facebook, lưu `fb_post_id`, bình luận cố định, chuyển `published`. Duyệt sau giờ thì đăng ở tick kế tiếp.
+4. Đã duyệt thì luồng Telegram đánh thức `tick` ngay (không chờ 60 giây): `tick` chuyển `publishing`, đăng lên Facebook, lưu `fb_post_id`, bình luận cố định, chuyển `published`. Chỉ luồng `tick` được đăng bài (tránh đăng trùng).
 5. Đến 20:00 bài còn `pending` chuyển `expired` và báo Telegram.
 
 Trạng thái bài: `drafting`, `pending`, `approved`, `publishing`, `published`, `rejected`, `expired`.

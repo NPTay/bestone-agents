@@ -123,7 +123,7 @@ Muốn đổi chủ đề tìm tin cho bài sáng: sửa `config\research_querie
 - Bot gửi bản nháp kèm nút **Đăng** / **Không đăng**. Bấm nút để duyệt hoặc bỏ.
 - **Góp ý**: nhấn giữ vào tin nhắn bản nháp, chọn **Trả lời (Reply)**, rồi gõ góp ý (ví dụ "viết ngắn lại"). Bot sửa và gửi bản mới kèm nút mới. Nút của bản cũ không còn tác dụng.
 - Khi có **hai bài đang chờ duyệt cùng lúc**, bạn **bắt buộc phải Reply đúng tin nhắn của bài** muốn sửa. Nếu gõ chữ tự do, bot sẽ hỏi lại và không sửa bài nào.
-- Giờ đăng: bài sáng 09:00, bài chiều 16:30. Duyệt trước giờ thì đăng đúng giờ; duyệt sau giờ thì đăng ở lần kiểm tra kế tiếp (trong khoảng một phút). Ngay sau khi đăng, chương trình tự bình luận dưới bài một đoạn giới thiệu cố định (Bestone, hotline, website).
+- Giờ đăng: bài được đăng **ngay khi anh/chị bấm ✅ Đăng** trên Telegram (thường trong vài giây). Bài sáng được soạn lúc 08:00, bài chiều lúc 15:00; chưa duyệt đến 20:00 thì bỏ. Ngay sau khi đăng, chương trình tự bình luận dưới bài một đoạn giới thiệu cố định (Bestone, hotline, website).
 - Bài **chưa duyệt đến 20:00 sẽ bị bỏ**, không dời sang hôm sau. Telegram báo rõ lý do.
 
 ## Khi máy bật muộn, tắt giữa chừng hoặc mất mạng

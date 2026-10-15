@@ -134,19 +134,37 @@ def _loop(name: str, stop: threading.Event, body: Callable[[], None], pause: flo
             stop.wait(pause)
 
 
-def _tick_worker(deps: Deps, stop: threading.Event) -> None:
+def _tick_loop(
+    stop: threading.Event, wake: threading.Event, body: Callable[[], None], pause: float
+) -> None:
+    """Run `body` every `pause` seconds, or right away when `wake` is set (an approval)."""
+    while not stop.is_set():
+        try:
+            body()
+        except Exception as exc:
+            logger.error("tick loop error: %s", type(exc).__name__)
+        if stop.is_set():
+            break
+        wake.wait(pause)
+        wake.clear()
+
+
+def _tick_worker(deps: Deps, stop: threading.Event, wake: threading.Event) -> None:
     try:
         startup(deps, clock.utcnow())
     except Exception as exc:
         logger.error("Startup failed: %s", type(exc).__name__)
-    stop.wait(TICK_SECONDS)
-    _loop("tick", stop, lambda: tick(deps, clock.utcnow()), TICK_SECONDS)
+    wake.wait(TICK_SECONDS)
+    wake.clear()
+    _tick_loop(stop, wake, lambda: tick(deps, clock.utcnow()), TICK_SECONDS)
 
 
-def _poll_worker(deps: Deps, bot: TelegramBot, stop: threading.Event) -> None:
+def _poll_worker(
+    deps: Deps, bot: TelegramBot, stop: threading.Event, wake: threading.Event
+) -> None:
     def body() -> None:
         started = time.monotonic()
-        poll_once(deps.db_factory, bot, deps.llm, deps.settings, clock.utcnow)
+        poll_once(deps.db_factory, bot, deps.llm, deps.settings, clock.utcnow, wake.set)
         # getUpdates long-polls 30 s; a quick return usually means an error, so pause.
         if time.monotonic() - started < 1.0:
             stop.wait(POLL_ERROR_PAUSE)
@@ -216,13 +234,14 @@ def _serve(settings: Settings, open_browser: bool) -> int:
     _announce(bot, settings)
 
     stop = threading.Event()
+    wake = threading.Event()  # set by the Telegram thread when the director approves
     threading.Thread(
-        target=_tick_worker, args=(deps, stop), name="tick", daemon=True
+        target=_tick_worker, args=(deps, stop, wake), name="tick", daemon=True
     ).start()
     if not isinstance(bot, NullTelegram):
         poll_bot = TelegramBot(settings.TELEGRAM_BOT_TOKEN, settings.TELEGRAM_ADMIN_CHAT_ID)
         threading.Thread(
-            target=_poll_worker, args=(deps, poll_bot, stop), name="telegram", daemon=True
+            target=_poll_worker, args=(deps, poll_bot, stop, wake), name="telegram", daemon=True
         ).start()
     if open_browser:
         threading.Thread(

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app import clock
 from app.db.models import Post
 from app.guardrails.judge import GuardrailReport
-from app.schedule_times import DAY_END, Slot, local_now, publish_at
+from app.schedule_times import DAY_END, Slot, local_now
 
 PostStatus = Literal[
     "drafting",
@@ -125,14 +125,13 @@ def reject(db: Session, post_id: uuid.UUID, revision: int) -> Literal["ok", "sta
 
 
 def due_for_publish(db: Session, now: datetime) -> list[Post]:
-    """Approved posts of local today whose slot time has passed, until DAY_END."""
+    """Approved posts of local today, until DAY_END: published as soon as approved."""
     local = local_now(now)
     if local.time() >= DAY_END:
         return []
-    approved = db.scalars(
-        select(Post).where(Post.status == "approved", Post.day == local.date())
-    ).all()
-    return [p for p in approved if publish_at(p.day, p.slot) <= now]  # type: ignore[arg-type]
+    return list(
+        db.scalars(select(Post).where(Post.status == "approved", Post.day == local.date())).all()
+    )
 
 
 def expire_open(db: Session, now: datetime) -> list[tuple[Post, str]]:

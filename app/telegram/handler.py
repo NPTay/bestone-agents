@@ -18,7 +18,7 @@ from app.llm.client import LLMClient, LLMError
 from app.llm.prompts import load_knowledge
 from app.posts import store
 from app.posts.store import PostDraft
-from app.schedule_times import LOCAL_TZ, local_now, publish_at
+from app.schedule_times import local_now
 from app.telegram.bot import TelegramError
 from app.telegram.review import send_for_review_safe
 
@@ -34,6 +34,7 @@ TXT_STALE = "Nút này đã cũ (bài đã có bản mới hoặc đã xử lý)
 TXT_BLOCKED = "Bài có lỗi thông tin, chưa thể đăng. Hãy góp ý để AI sửa."
 TXT_BAD_BUTTON = "Nút không hợp lệ."
 TXT_REJECTED = "Đã bỏ bài này."
+TXT_APPROVED = "Đã duyệt. Bài đang được đăng lên Fanpage."
 TXT_REVISING = "Đang sửa theo góp ý…"
 TXT_NO_LLM = "AI chưa được cấu hình nên chưa sửa được bài."
 TXT_LLM_FAILED = "Sửa bài bị lỗi, anh/chị thử gõ lại góp ý sau ít phút."
@@ -85,7 +86,13 @@ def _pending_today(db: Session, now: datetime) -> list[Post]:
     return [p for p in store.posts_for_day(db, local_now(now).date()) if p.status == "pending"]
 
 
-def _handle_callback(db: Session, bot: _Bot, cq: dict[str, Any], now: datetime) -> None:
+def _handle_callback(
+    db: Session,
+    bot: _Bot,
+    cq: dict[str, Any],
+    now: datetime,
+    on_approved: Callable[[], None] | None = None,
+) -> None:
     callback_id = str(cq.get("id", ""))
     parsed = _parse_button(str(cq.get("data", "")))
     if parsed is None:
@@ -100,15 +107,10 @@ def _handle_callback(db: Session, bot: _Bot, cq: dict[str, Any], now: datetime) 
         elif result == "blocked":
             bot.answer_callback(callback_id, TXT_BLOCKED)
         else:
-            post = db.get(Post, post_id)
-            assert post is not None
-            when = publish_at(post.day, post.slot)  # type: ignore[arg-type]
-            if now >= when:
-                text = "Đã duyệt. Bài sẽ đăng ngay."
-            else:
-                text = f"Đã duyệt. Bài sẽ đăng lúc {when.astimezone(LOCAL_TZ):%H:%M}."
-            bot.answer_callback(callback_id, text)
+            bot.answer_callback(callback_id, TXT_APPROVED)
             bot.edit_buttons_removed(message_id)
+            if on_approved is not None:
+                on_approved()  # wake the tick thread so it publishes now
         return
     if store.reject(db, post_id, revision) == "ok":
         bot.answer_callback(callback_id, TXT_REJECTED)
@@ -192,13 +194,14 @@ def handle_update(
     update: dict[str, Any],
     now: datetime,
     admin_chat_id: str,
+    on_approved: Callable[[], None] | None = None,
 ) -> None:
     cq = update.get("callback_query")
     if isinstance(cq, dict):
         chat_id = ((cq.get("message") or {}).get("chat") or {}).get("id")
         if chat_id is None or str(chat_id) != str(admin_chat_id):
             return
-        _handle_callback(db, bot, cq, now)
+        _handle_callback(db, bot, cq, now, on_approved)
         return
     message = update.get("message")
     if isinstance(message, dict):
@@ -214,6 +217,7 @@ def poll_once(
     llm: LLMClient | None,
     settings: Settings,
     now_fn: Callable[[], datetime],
+    on_approved: Callable[[], None] | None = None,
 ) -> None:
     """Fetch and handle pending updates; the offset advances after each one."""
     with db_factory() as db:
@@ -227,7 +231,13 @@ def poll_once(
         with db_factory() as db:
             try:
                 handle_update(
-                    db, bot, llm, update, now_fn(), str(settings.TELEGRAM_ADMIN_CHAT_ID)
+                    db,
+                    bot,
+                    llm,
+                    update,
+                    now_fn(),
+                    str(settings.TELEGRAM_ADMIN_CHAT_ID),
+                    on_approved,
                 )
             except Exception as exc:
                 db.rollback()

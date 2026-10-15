@@ -65,15 +65,34 @@ def test_approve_button_approves_and_removes_keyboard(db: Session) -> None:
     bot = FakeTelegram()
     handle_update(db, bot, None, button(post, "ok"), NOW, ADMIN)
     assert post.status == "approved"
-    assert texts(bot, "answer_callback") == ["Đã duyệt. Bài sẽ đăng lúc 09:00."]
+    assert texts(bot, "answer_callback") == ["Đã duyệt. Bài đang được đăng lên Fanpage."]
     assert {"method": "edit_buttons_removed", "message_id": 50} in bot.sent
 
 
-def test_approve_after_slot_time_says_now(db: Session) -> None:
+def test_approve_wakes_the_publisher_immediately(db: Session) -> None:
     post = make_pending(db)
     bot = FakeTelegram()
-    handle_update(db, bot, None, button(post, "ok"), local(D, 10, 0), ADMIN)
-    assert texts(bot, "answer_callback") == ["Đã duyệt. Bài sẽ đăng ngay."]
+    woken: list[bool] = []
+    handle_update(
+        db, bot, None, button(post, "ok"), NOW, ADMIN, on_approved=lambda: woken.append(True)
+    )
+    assert woken == [True]
+
+
+def test_stale_approve_does_not_wake_the_publisher(db: Session) -> None:
+    post = make_pending(db)
+    bot = FakeTelegram()
+    woken: list[bool] = []
+    handle_update(
+        db,
+        bot,
+        None,
+        button(post, "ok", revision=9),
+        NOW,
+        ADMIN,
+        on_approved=lambda: woken.append(True),
+    )
+    assert woken == []
 
 
 def test_reject_button(db: Session) -> None:

@@ -28,7 +28,9 @@ def _post(**kw: Any) -> Post:
 
 def test_format_review_layout() -> None:
     text = format_review(_post())
-    assert text.startswith("📝 BÀI SÁNG 13/10 — đăng lúc 09:00 (bản 2)\n\nTiêu đề\n\nNội dung bài.")
+    assert text.startswith(
+        "📝 BÀI SÁNG 13/10 — đăng ngay khi bấm ✅ Đăng (bản 2)\n\nTiêu đề\n\nNội dung bài."
+    )
     assert "\n\nLiên hệ ngay\n#a #b\n\nNguồn: Báo X – http://x.vn/1" in text
     assert text.endswith("💬 Muốn sửa: trả lời (reply) tin nhắn này và gõ góp ý.")
     assert "⚠️" not in text and "⛔" not in text
@@ -43,7 +45,7 @@ def test_format_review_afternoon_and_optional_lines() -> None:
             guardrail_report={"flags": ["f1", "f2"]},
         )
     )
-    assert "BÀI CHIỀU" in text and "16:30" in text
+    assert "BÀI CHIỀU" in text and "16:30" not in text
     assert "Nguồn:" not in text
     assert "Ảnh minh họa AI" in text
     assert "⚠️ Cần xem: f1; f2" in text

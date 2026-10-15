@@ -52,14 +52,14 @@ Thành công nghĩa là: mỗi ngày Giám đốc chỉ cần mở Telegram trê
 | Giờ | Việc |
 |---|---|
 | ~08:00 (khi máy bật) | Tìm tin + soạn bài sáng + lấy/tạo ảnh → gửi Telegram (mục tiêu trước ~08:30) |
-| 09:00 | Nếu đã duyệt: đăng bài sáng → bình luận giới thiệu |
+| khi duyệt | Đăng bài sáng ngay → bình luận giới thiệu (trước 15/10/2026: 09:00) |
 | ~15:00 | Soạn bài chiều từ `Tai Lieu` + ảnh `Picture` → gửi Telegram |
-| 16:30 | Nếu đã duyệt: đăng bài chiều → bình luận giới thiệu |
+| khi duyệt | Đăng bài chiều ngay → bình luận giới thiệu (trước 15/10/2026: 16:30) |
 | 08:00–20:00 | Kiểm tra tin nhắn mới mỗi ~2–3 phút → soạn trả lời → Telegram chờ duyệt |
 
 ### 6.2 Quy tắc duyệt
 - Bài và câu trả lời tin nhắn: chỉ đi ra khi Giám đốc bấm "Đăng"/"Gửi" trên Telegram.
-- Duyệt trước giờ đăng → đăng đúng giờ. Duyệt sau giờ đăng → đăng ngay lúc bấm duyệt.
+- ~~Duyệt trước giờ đăng → đăng đúng giờ.~~ **Giám đốc đổi ngày 15/10/2026: bài đăng ngay khi bấm duyệt**, không chờ 09:00/16:30 (vẫn chỉ trong ngày, trước 20:00).
 - Đến 20:00 bài nào chưa duyệt thì bỏ, không dời sang hôm sau.
 - Góp ý bằng chữ → AI sửa → gửi bản mới (không giới hạn số vòng do Giám đốc quyết định khi nào dừng).
 - Câu hỏi nhạy cảm (giá, báo giá, bảo hành, cam kết hiệu quả, chứng nhận/TCVN, hợp đồng, khiếu nại, dự án cụ thể sắp thi công, điều không có trong tài liệu): AI KHÔNG soạn câu trả lời nội dung; chỉ báo Giám đốc trên Telegram kèm nội dung câu hỏi + tên khách. Theo quy tắc G6 có sẵn trong `knowledge/guardrails_compliance.md`.

@@ -58,7 +58,7 @@ def write_morning(
     ]
     user = "\n\n".join(
         [
-            "NHIỆM VỤ: Viết BÀI BUỔI SÁNG (đăng 09:00) theo chế độ \"Bài buổi sáng\". "
+            "NHIỆM VỤ: Viết BÀI BUỔI SÁNG theo chế độ \"Bài buổi sáng\". "
             "Chọn MỘT tin phù hợp nhất trong dữ liệu bên dưới, ghi đúng url của tin đó vào "
             "article_url. Nếu không tin nào phù hợp, trả article_url là chuỗi rỗng.",
             _recent(recent_titles),
@@ -111,7 +111,7 @@ def write_afternoon(
     """Write the afternoon KB/catalogue post; names a project only when it is verified."""
     user = "\n\n".join(
         [
-            "NHIỆM VỤ: Viết BÀI BUỔI CHIỀU (đăng 16:30) theo chế độ \"Bài buổi chiều\": "
+            "NHIỆM VỤ: Viết BÀI BUỔI CHIỀU theo chế độ \"Bài buổi chiều\": "
             "chọn một trụ cột nội dung và một chủ đề từ kho tri thức.",
             _recent(recent_titles),
             _picture_context(choice),

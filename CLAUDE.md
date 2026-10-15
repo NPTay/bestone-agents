@@ -3,7 +3,7 @@
 Đây là file bộ nhớ chính. Claude Code đọc file này ĐẦU TIÊN, sau đó đọc theo thứ tự trong mục "Bản đồ tài liệu".
 
 ## Sứ mệnh dự án
-Chương trình chạy ngay trên máy tính Windows của Giám đốc (không VPS, không Docker, không đăng nhập) để quản lý Facebook Fanpage của C.G. Engineering Việt Nam (sản phẩm: phụ gia tự chống thấm Bestone): mỗi ngày soạn 2 bài (sáng từ tin ngành, chiều từ tài liệu và ảnh công trình), gửi Telegram cho Giám đốc duyệt bằng nút bấm hoặc góp ý, đăng đúng giờ và bình luận giới thiệu cố định dưới bài. Trang "Hôm nay" trên máy (127.0.0.1) chỉ để xem. Trả lời Messenger là Đợt 2.
+Chương trình chạy ngay trên máy tính Windows của Giám đốc (không VPS, không Docker, không đăng nhập) để quản lý Facebook Fanpage của C.G. Engineering Việt Nam (sản phẩm: phụ gia tự chống thấm Bestone): mỗi ngày soạn 2 bài (sáng từ tin ngành, chiều từ tài liệu và ảnh công trình), gửi Telegram cho Giám đốc duyệt bằng nút bấm hoặc góp ý, đăng ngay khi Giám đốc bấm duyệt và bình luận giới thiệu cố định dưới bài. Trang "Hôm nay" trên máy (127.0.0.1) chỉ để xem. Trả lời Messenger là Đợt 2.
 
 Bối cảnh: doanh nghiệp B2B siêu tinh gọn, một người dùng duy nhất (Giám đốc, không chuyên IT), không thêm nhân sự.
 
@@ -41,7 +41,7 @@ Dev local (Windows, thư mục gốc repo; PowerShell dùng `\`, Git Bash dùng 
 - Nhật ký: `data/logs/app.log`
 
 ## Trạng thái
-- Đợt 1 (đăng bài: bài sáng + bài chiều, duyệt Telegram, đăng đúng giờ, bình luận cố định, trang "Hôm nay", tự chạy cùng Windows, công cụ cài đặt) đã xây xong trên nhánh `desktop-dot1`; test xanh.
+- Đợt 1 (đăng bài: bài sáng + bài chiều, duyệt Telegram, đăng ngay khi duyệt, bình luận cố định, trang "Hôm nay", tự chạy cùng Windows, công cụ cài đặt) đã xây xong trên nhánh `desktop-dot1`; test xanh.
 - CHƯA kiểm chứng với khóa thật của Giám đốc, với Task Scheduler thật, và chưa đăng bài thật. Việc còn lại: làm theo `docs/HUONG_DAN_CAI_DAT.md`, chạy `DRY_RUN=true` vài ngày, rồi mới `DRY_RUN=false`.
 - Đợt 2 (trả lời tin nhắn Messenger) làm sau; cần Meta App Review cho `pages_messaging`, xem `docs/CHUAN_BI_APP_REVIEW.md`.
 - Thông tin công trình ở mục 13 của KB còn `[GĐ BỔ SUNG]`: Giám đốc cần điền.

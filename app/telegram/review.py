@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 # Telegram's limit is 4096 characters counted in UTF-16 code units.
 MAX_UTF16 = 4096
 SLOT_LABEL = {"morning": "SÁNG", "afternoon": "CHIỀU"}
-SLOT_TIME = {"morning": "09:00", "afternoon": "16:30"}
 FOOTER = "💬 Muốn sửa: trả lời (reply) tin nhắn này và gõ góp ý."
 BLOCKING_NOTICE = "⛔ Bài có lỗi thông tin nên chưa thể đăng. Hãy góp ý để AI sửa."
 
@@ -31,7 +30,7 @@ class _Bot(Protocol):
 def _compose(post: Post, body: str) -> str:
     header = (
         f"📝 BÀI {SLOT_LABEL[post.slot]} {post.day:%d/%m} — "
-        f"đăng lúc {SLOT_TIME[post.slot]} (bản {post.revision})"
+        f"đăng ngay khi bấm ✅ Đăng (bản {post.revision})"
     )
     parts = [header, post.title, body, f"{post.cta}\n{' '.join(post.hashtags or [])}"]
     tail: list[str] = []
